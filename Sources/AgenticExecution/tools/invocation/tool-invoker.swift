@@ -24,10 +24,15 @@ public struct ToolInvoker: Sendable {
             context: context
         )
 
-        let preflight = try await registry.preflight(
+        var preflight = try await registry.preflight(
             call,
             context: context
         )
+
+        preflight.workingDirectory =
+            context.workspaceLocation?
+                .absoluteURL
+                .path
 
         return .init(
             call: call,

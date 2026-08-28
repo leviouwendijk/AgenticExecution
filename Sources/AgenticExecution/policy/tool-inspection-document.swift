@@ -142,10 +142,18 @@ private extension ToolPreflight {
         var items: [ToolInspectionItem] = []
 
         appendOptionalField(
-            label: "workspace",
+            label: "workspace root",
             value: workspaceRoot,
             to: &items
         )
+
+        if workingDirectory != workspaceRoot {
+            appendOptionalField(
+                label: "working location",
+                value: workingDirectory,
+                to: &items
+            )
+        }
 
         appendList(
             label: "roots",

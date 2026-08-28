@@ -6,6 +6,7 @@ public struct ToolPreflight: Sendable, Codable, Hashable, CustomStringConvertibl
     public let toolName: String
     public let risk: ActionRisk
     public let workspaceRoot: String?
+    public internal(set) var workingDirectory: String?
     public let targetPaths: [String]
     public let summary: String
     public let commandPreview: String?
@@ -41,6 +42,7 @@ public struct ToolPreflight: Sendable, Codable, Hashable, CustomStringConvertibl
         toolName: String,
         risk: ActionRisk,
         workspaceRoot: String? = nil,
+        workingDirectory: String? = nil,
         targetPaths: [String] = [],
         summary: String,
         commandPreview: String? = nil,
@@ -74,6 +76,7 @@ public struct ToolPreflight: Sendable, Codable, Hashable, CustomStringConvertibl
         self.toolName = toolName
         self.risk = risk
         self.workspaceRoot = workspaceRoot
+        self.workingDirectory = workingDirectory
         self.targetPaths = targetPaths
         self.summary = summary
         self.commandPreview = commandPreview
@@ -182,7 +185,15 @@ public struct ToolPreflight: Sendable, Codable, Hashable, CustomStringConvertibl
 
         if let workspaceRoot {
             lines.append(
-                "workspace: \(workspaceRoot)"
+                "workspace root: \(workspaceRoot)"
+            )
+        }
+
+        if let workingDirectory,
+           workingDirectory != workspaceRoot
+        {
+            lines.append(
+                "working location: \(workingDirectory)"
             )
         }
 

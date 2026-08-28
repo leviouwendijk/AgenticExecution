@@ -1,5 +1,6 @@
 import Agentic
 import AgenticWorkspace
+import Primitives
 
 public struct ToolRegistry: Sendable {
     private var tools: [AgentToolIdentifier: any AgentTool]
@@ -116,10 +117,19 @@ public struct ToolRegistry: Sendable {
             throw ToolDispatchError.unknownTool(toolCall.name)
         }
 
-        let output = try await tool.call(
-            input: toolCall.input,
-            workspace: workspace
-        )
+        let output: JSONValue
+        let isError: Bool
+
+        do {
+            output = try await tool.call(
+                input: toolCall.input,
+                workspace: workspace
+            )
+            isError = false
+        } catch let failure as AgentToolReportedFailure {
+            output = failure.output
+            isError = true
+        }
 
         let processing = tool.processResult(
             input: toolCall.input,
@@ -134,7 +144,8 @@ public struct ToolRegistry: Sendable {
             processing:
                 processing.isEmpty
                     ? nil
-                    : processing
+                    : processing,
+            isError: isError
         )
     }
 }

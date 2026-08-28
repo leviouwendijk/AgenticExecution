@@ -26,12 +26,21 @@ public extension ToolRegistry {
             )
         }
 
-        let output = try await tool.call(
-            input: call.input,
-            context: context.withToolCallID(
-                call.id
+        let output: JSONValue
+        let isError: Bool
+
+        do {
+            output = try await tool.call(
+                input: call.input,
+                context: context.withToolCallID(
+                    call.id
+                )
             )
-        )
+            isError = false
+        } catch let failure as AgentToolReportedFailure {
+            output = failure.output
+            isError = true
+        }
 
         let processing = tool.processResult(
             input: call.input,
@@ -46,7 +55,8 @@ public extension ToolRegistry {
             processing:
                 processing.isEmpty
                     ? nil
-                    : processing
+                    : processing,
+            isError: isError
         )
     }
 }
