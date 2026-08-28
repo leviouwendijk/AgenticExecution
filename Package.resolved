@@ -1,5 +1,5 @@
 {
-  "originHash" : "7b6eaf4d130684914fb0f2bbf912aef8cac3d1b906e416e4bccd6e45e581529f",
+  "originHash" : "d0382d62d6def6a4d8adde64070b57eb026fa0d584a39a27b1dfd1267e69fe5f",
   "pins" : [
     {
       "identity" : "agentic",
@@ -128,6 +128,15 @@
       }
     },
     {
+      "identity" : "schema",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/leviouwendijk/Schema.git",
+      "state" : {
+        "branch" : "master",
+        "revision" : "ab087b82e4b314bc2780fbfdffad122249c3e9ad"
+      }
+    },
+    {
       "identity" : "selection",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/leviouwendijk/Selection.git",
@@ -143,6 +152,15 @@
       "state" : {
         "branch" : "master",
         "revision" : "86a939d7bbb3e25808f88fbcedcee4069a5a5ae1"
+      }
+    },
+    {
+      "identity" : "swift-syntax",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/swiftlang/swift-syntax.git",
+      "state" : {
+        "revision" : "79e4b74a295b6eb74a8b585e3a39d29e70c1dbd1",
+        "version" : "603.0.2"
       }
     },
     {
