@@ -1,6 +1,23 @@
 import Agentic
+import AgenticWorkspace
 
 public enum ToolInvocation {}
+
+public extension ToolInvocation {
+    struct Execution:
+        Sendable,
+        Codable,
+        Hashable
+    {
+        public let workspace: WorkspaceTarget?
+
+        public init(
+            workspace: WorkspaceTarget? = nil
+        ) {
+            self.workspace = workspace
+        }
+    }
+}
 
 public extension ToolInvocation {
     struct Review: Sendable, Codable, Hashable {

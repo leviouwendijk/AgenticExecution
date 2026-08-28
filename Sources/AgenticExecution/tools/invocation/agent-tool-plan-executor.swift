@@ -95,8 +95,16 @@ private extension AgentToolPlanExecutor {
         let invocation: ToolInvocation.Result
 
         do {
+            let execution = try node.execution.map {
+                try JSONToolBridge.decode(
+                    ToolInvocation.Execution.self,
+                    from: $0
+                )
+            }
+
             invocation = try await invoker.invoke(
                 call,
+                execution: execution,
                 context: context,
                 approvalHandler: approvalHandler
             )

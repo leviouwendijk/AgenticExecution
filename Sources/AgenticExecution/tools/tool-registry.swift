@@ -84,13 +84,27 @@ public struct ToolRegistry: Sendable {
         _ toolCall: AgentToolCall,
         workspace: AgentWorkspace? = nil
     ) async throws -> ToolPreflight {
+        try await preflight(
+            toolCall,
+            context: .init(
+                workspace: workspace
+            )
+        )
+    }
+
+    public func preflight(
+        _ toolCall: AgentToolCall,
+        context: AgentToolExecutionContext
+    ) async throws -> ToolPreflight {
         guard let tool = tool(named: toolCall.name) else {
             throw ToolDispatchError.unknownTool(toolCall.name)
         }
 
         return try await tool.preflight(
             input: toolCall.input,
-            workspace: workspace
+            context: context.withToolCallID(
+                toolCall.id
+            )
         )
     }
 

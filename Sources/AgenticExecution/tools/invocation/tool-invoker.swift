@@ -1,4 +1,5 @@
 import Agentic
+import AgenticWorkspace
 
 public struct ToolInvoker: Sendable {
     public let registry: ToolRegistry
@@ -14,11 +15,18 @@ public struct ToolInvoker: Sendable {
 
     public func review(
         _ call: AgentToolCall,
+        execution: ToolInvocation.Execution? = nil,
         context: AgentToolExecutionContext = .init()
     ) async throws -> ToolInvocation.Review {
+        let context = try targetedContext(
+            for: call,
+            execution: execution,
+            context: context
+        )
+
         let preflight = try await registry.preflight(
             call,
-            workspace: context.workspace
+            context: context
         )
 
         return .init(
@@ -33,9 +41,16 @@ public struct ToolInvoker: Sendable {
 
     public func invoke(
         _ call: AgentToolCall,
+        execution: ToolInvocation.Execution? = nil,
         context: AgentToolExecutionContext = .init(),
         approvalHandler: (any ToolApprovalHandler)? = nil
     ) async throws -> ToolInvocation.Result {
+        let context = try targetedContext(
+            for: call,
+            execution: execution,
+            context: context
+        )
+
         let review = try await review(
             call,
             context: context
@@ -95,6 +110,44 @@ public struct ToolInvoker: Sendable {
             plan,
             context: context,
             approvalHandler: approvalHandler
+        )
+    }
+}
+
+private extension ToolInvoker {
+    func targetedContext(
+        for call: AgentToolCall,
+        execution: ToolInvocation.Execution?,
+        context: AgentToolExecutionContext
+    ) throws -> AgentToolExecutionContext {
+        guard let target = execution?.workspace else {
+            return context
+        }
+
+        guard let tool = registry.tool(
+            named: call.name
+        ) else {
+            throw ToolDispatchError.unknownTool(
+                call.name
+            )
+        }
+
+        guard tool is any WorkspaceTargetableTool else {
+            throw WorkspaceToolTargetingError.unsupportedTool(
+                call.name
+            )
+        }
+
+        guard let workspace = context.workspace else {
+            throw WorkspaceToolTargetingError.workspaceRequired(
+                call.name
+            )
+        }
+
+        return context.withWorkspaceLocation(
+            try workspace.location(
+                for: target
+            )
         )
     }
 }

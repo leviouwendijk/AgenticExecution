@@ -1,5 +1,6 @@
 import Agentic
 import AgenticWorkspace
+import Foundation
 
 public enum AgentToolExecutionMode: String, Sendable, Codable, Hashable, CaseIterable {
     case model_tool_call
@@ -9,6 +10,7 @@ public enum AgentToolExecutionMode: String, Sendable, Codable, Hashable, CaseIte
 
 public struct AgentToolExecutionContext: Sendable {
     public let workspace: AgentWorkspace?
+    public let workspaceLocation: WorkspaceLocation?
     public let sessionID: String?
     public let toolCallID: String?
     public let preparedIntentID: PreparedIntentIdentifier?
@@ -18,6 +20,7 @@ public struct AgentToolExecutionContext: Sendable {
 
     public init(
         workspace: AgentWorkspace? = nil,
+        workspaceLocation: WorkspaceLocation? = nil,
         sessionID: String? = nil,
         toolCallID: String? = nil,
         preparedIntentID: PreparedIntentIdentifier? = nil,
@@ -26,6 +29,7 @@ public struct AgentToolExecutionContext: Sendable {
         metadata: [String: String] = [:]
     ) {
         self.workspace = workspace
+        self.workspaceLocation = workspaceLocation
         self.sessionID = sessionID
         self.toolCallID = toolCallID
         self.preparedIntentID = preparedIntentID
@@ -34,11 +38,32 @@ public struct AgentToolExecutionContext: Sendable {
         self.metadata = metadata
     }
 
+    public var workingDirectoryURL: URL? {
+        workspaceLocation?.absoluteURL
+            ?? workspace?.rootURL
+    }
+
+    public func withWorkspaceLocation(
+        _ workspaceLocation: WorkspaceLocation?
+    ) -> Self {
+        .init(
+            workspace: workspace,
+            workspaceLocation: workspaceLocation,
+            sessionID: sessionID,
+            toolCallID: toolCallID,
+            preparedIntentID: preparedIntentID,
+            executionMode: executionMode,
+            guidelineRelations: guidelineRelations,
+            metadata: metadata
+        )
+    }
+
     public func withToolCallID(
         _ toolCallID: String?
     ) -> Self {
         .init(
             workspace: workspace,
+            workspaceLocation: workspaceLocation,
             sessionID: sessionID,
             toolCallID: toolCallID,
             preparedIntentID: preparedIntentID,
@@ -53,6 +78,7 @@ public struct AgentToolExecutionContext: Sendable {
     ) -> Self {
         .init(
             workspace: workspace,
+            workspaceLocation: workspaceLocation,
             sessionID: sessionID,
             toolCallID: toolCallID,
             preparedIntentID: preparedIntentID,
@@ -67,6 +93,7 @@ public struct AgentToolExecutionContext: Sendable {
     ) -> Self {
         .init(
             workspace: workspace,
+            workspaceLocation: workspaceLocation,
             sessionID: sessionID,
             toolCallID: toolCallID,
             preparedIntentID: preparedIntentID,
@@ -91,6 +118,7 @@ public struct AgentToolExecutionContext: Sendable {
 
         return .init(
             workspace: workspace,
+            workspaceLocation: workspaceLocation,
             sessionID: sessionID,
             toolCallID: toolCallID,
             preparedIntentID: preparedIntentID,
@@ -105,6 +133,7 @@ public struct AgentToolExecutionContext: Sendable {
     ) -> Self {
         .init(
             workspace: workspace,
+            workspaceLocation: workspaceLocation,
             sessionID: sessionID,
             toolCallID: toolCallID,
             preparedIntentID: preparedIntentID,
@@ -120,19 +149,3 @@ public struct AgentToolExecutionContext: Sendable {
 }
 
 public typealias AgentToolContext = AgentToolExecutionContext
-
-// public struct AgentToolContext: Sendable {
-//     public let workspace: AgentWorkspace?
-//     public let sessionID: String?
-//     public let metadata: [String: String]
-
-//     public init(
-//         workspace: AgentWorkspace? = nil,
-//         sessionID: String? = nil,
-//         metadata: [String: String] = [:]
-//     ) {
-//         self.workspace = workspace
-//         self.sessionID = sessionID
-//         self.metadata = metadata
-//     }
-// }

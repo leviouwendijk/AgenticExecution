@@ -19,6 +19,11 @@ public protocol AgentTool: Sendable {
         workspace: AgentWorkspace?
     ) async throws -> ToolPreflight
 
+    func preflight(
+        input: JSONValue,
+        context: AgentToolExecutionContext
+    ) async throws -> ToolPreflight
+
     func call(
         input: JSONValue,
         workspace: AgentWorkspace?
@@ -66,6 +71,16 @@ public extension AgentTool {
             workspaceRoot: workspace?.rootURL.path,
             summary: description,
             sideEffects: risk.defaultSideEffects
+        )
+    }
+
+    func preflight(
+        input: JSONValue,
+        context: AgentToolExecutionContext
+    ) async throws -> ToolPreflight {
+        try await preflight(
+            input: input,
+            workspace: context.workspace
         )
     }
 
