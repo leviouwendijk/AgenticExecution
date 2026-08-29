@@ -8,15 +8,27 @@ public enum AgentToolPlanRunError:
     Equatable
 {
     case runNotSuspended
+    case suspensionAlreadyResolved
+    case suspensionNotResolved
     case missingSuspendedCall(String)
+    case unsupportedContinuation(String)
 
     public var errorDescription: String? {
         switch self {
         case .runNotSuspended:
-            return "AgentToolPlanRun must be suspended before its failed node can be retried."
+            return "AgentToolPlanRun must be suspended before recovery control can be applied."
+
+        case .suspensionAlreadyResolved:
+            return "The suspended AgentToolPlan node is already resolved and is awaiting an explicit continuation decision."
+
+        case .suspensionNotResolved:
+            return "The suspended AgentToolPlan node must be retried successfully or explicitly skipped before its parent can resume."
 
         case .missingSuspendedCall(let callID):
             return "Suspended tool call '\(callID)' is no longer present in the immutable parent AgentToolPlan."
+
+        case .unsupportedContinuation(let path):
+            return "Automatic continuation from '\(path)' is not supported because the interruption is inside batch or outcome-branch ancestry."
         }
     }
 }
@@ -25,8 +37,9 @@ public enum AgentToolPlanRunError:
 ///
 /// The existing executor remains the authority for governed node execution,
 /// execution metadata, approvals, and authored success/failure/denial branches.
-/// This layer retains attempts and identifies recovery points without mutating
-/// the semantic AgentToolPlan.
+/// This layer retains attempts, typed suspension reasons, explicit recovery
+/// decisions, and conservative sequence-only continuation without mutating the
+/// semantic AgentToolPlan.
 public struct AgentToolPlanRunExecutor:
     Sendable
 {
@@ -64,26 +77,28 @@ public struct AgentToolPlanRunExecutor:
                     result: result
                 ),
             ],
-            state: initialState(
+            revision: 1,
+            state: state(
                 for: result,
                 attemptNumber: attemptNumber
             )
         )
     }
 
-    /// Retry exactly the node recorded by the current suspension.
+    /// Retry exactly the currently interrupted node.
     ///
-    /// The retry executes the original node as a small plan, preserving its
-    /// execution metadata and authored outcome branches. A successful retry
-    /// records recovery but deliberately does not resume the parent plan.
+    /// The successful prefix and untouched parent suffix are never replayed.
+    /// The original node is executed as a small plan so its execution metadata
+    /// and authored outcome branches remain intact. A successful retry resolves
+    /// the interruption but does not automatically resume the parent.
     public func retry(
         _ run: AgentToolPlanRun,
         context: AgentToolExecutionContext = .init(),
         approvalHandler: (any ToolApprovalHandler)? = nil
     ) async throws -> AgentToolPlanRun {
-        guard case .suspended(let suspension) = run.state else {
-            throw AgentToolPlanRunError.runNotSuspended
-        }
+        let suspension = try unresolvedSuspension(
+            run
+        )
 
         guard let node = run.plan.root.node(
             containingCallID: suspension.callID
@@ -100,12 +115,16 @@ public struct AgentToolPlanRunExecutor:
             guidelineRelations: run.plan.guidelineRelations
         )
 
-        let result = try await planExecutor.execute(
+        let rawResult = try await planExecutor.execute(
             retryPlan,
             context: context,
             approvalHandler: approvalHandler
         )
-
+        let result = remap(
+            rawResult,
+            beneath: suspension.path
+        )
+        let revision = run.revision + 1
         let attempt = AgentToolPlanAttempt(
             number: attemptNumber,
             scope: .node(
@@ -115,14 +134,148 @@ public struct AgentToolPlanRunExecutor:
             result: result
         )
 
+        var resolutions = run.resolutions
+        let nextState: AgentToolPlanRunState
+
+        if result.outcome == .succeeded {
+            let resolution = AgentToolPlanResolution(
+                revision: revision,
+                path: suspension.path,
+                callID: suspension.callID,
+                kind: .retried(
+                    attemptNumber: attemptNumber
+                )
+            )
+
+            resolutions.append(
+                resolution
+            )
+
+            nextState = resolvedState(
+                plan: run.plan,
+                suspension: suspension,
+                resolution: resolution,
+                attemptNumber: attemptNumber
+            )
+        } else {
+            nextState = state(
+                for: result,
+                attemptNumber: attemptNumber
+            )
+        }
+
         return AgentToolPlanRun(
             id: run.id,
             plan: run.plan,
             relationship: run.relationship,
             attempts: run.attempts + [attempt],
-            state: retryState(
-                for: result,
+            resolutions: resolutions,
+            revision: revision,
+            state: nextState
+        )
+    }
+
+    /// Explicitly resolve the interrupted node without executing it again.
+    ///
+    /// This is the parent-side operation used after a manual fix or recovery
+    /// child plan when the fix already performed the failed node's intended
+    /// effect. Skipping still does not resume the parent automatically.
+    public func skip(
+        _ run: AgentToolPlanRun
+    ) throws -> AgentToolPlanRun {
+        let suspension = try unresolvedSuspension(
+            run
+        )
+        let revision = run.revision + 1
+        let resolution = AgentToolPlanResolution(
+            revision: revision,
+            path: suspension.path,
+            callID: suspension.callID,
+            kind: .skipped
+        )
+
+        return AgentToolPlanRun(
+            id: run.id,
+            plan: run.plan,
+            relationship: run.relationship,
+            attempts: run.attempts,
+            resolutions: run.resolutions + [resolution],
+            revision: revision,
+            state: resolvedState(
+                plan: run.plan,
                 suspension: suspension,
+                resolution: resolution,
+                attemptNumber: suspension.attemptNumber
+            )
+        )
+    }
+
+    /// Resume only the untouched sequence continuation after a resolved node.
+    ///
+    /// The successful prefix and resolved node are never executed again.
+    /// Continuation through batch or outcome-branch ancestry is deliberately
+    /// rejected until those semantics are explicitly designed.
+    public func resume(
+        _ run: AgentToolPlanRun,
+        context: AgentToolExecutionContext = .init(),
+        approvalHandler: (any ToolApprovalHandler)? = nil
+    ) async throws -> AgentToolPlanRun {
+        guard case .suspended(let suspension) = run.state else {
+            throw AgentToolPlanRunError.runNotSuspended
+        }
+
+        guard case .continuation_required = suspension.reason else {
+            throw AgentToolPlanRunError.suspensionNotResolved
+        }
+
+        guard let continuation = run.plan.root.sequenceContinuation(
+            afterCallID: suspension.callID,
+            path: "root"
+        ) else {
+            throw AgentToolPlanRunError.unsupportedContinuation(
+                suspension.path
+            )
+        }
+
+        let revision = run.revision + 1
+
+        guard !continuation.isEmpty else {
+            return AgentToolPlanRun(
+                id: run.id,
+                plan: run.plan,
+                relationship: run.relationship,
+                attempts: run.attempts,
+                resolutions: run.resolutions,
+                revision: revision,
+                state: .completed
+            )
+        }
+
+        let attemptNumber = run.attempts.count + 1
+        let result = try await executeContinuation(
+            continuation,
+            plan: run.plan,
+            attemptNumber: attemptNumber,
+            context: context,
+            approvalHandler: approvalHandler
+        )
+        let attempt = AgentToolPlanAttempt(
+            number: attemptNumber,
+            scope: .continuation(
+                afterPath: suspension.path
+            ),
+            result: result
+        )
+
+        return AgentToolPlanRun(
+            id: run.id,
+            plan: run.plan,
+            relationship: run.relationship,
+            attempts: run.attempts + [attempt],
+            resolutions: run.resolutions,
+            revision: revision,
+            state: state(
+                for: result,
                 attemptNumber: attemptNumber
             )
         )
@@ -136,77 +289,183 @@ private extension AgentToolPlanRunExecutor {
         )
     }
 
-    func initialState(
+    func unresolvedSuspension(
+        _ run: AgentToolPlanRun
+    ) throws -> AgentToolPlanSuspension {
+        guard case .suspended(let suspension) = run.state else {
+            throw AgentToolPlanRunError.runNotSuspended
+        }
+
+        switch suspension.reason {
+        case .failure(_),
+             .human_review:
+            return suspension
+
+        case .continuation_required:
+            throw AgentToolPlanRunError.suspensionAlreadyResolved
+        }
+    }
+
+    func state(
         for result: AgentToolPlanResult,
         attemptNumber: Int
     ) -> AgentToolPlanRunState {
-        if result.outcome == .succeeded {
+        switch result.outcome {
+        case .succeeded:
             return .completed
-        }
 
-        if result.outcome == .failed,
-           let record = result.records.last(
+        case .failed:
+            guard let record = result.records.last(
                 where: {
                     $0.outcome == .failed
                 }
-           )
-        {
+            ) else {
+                return .stopped(
+                    .failed
+                )
+            }
+
             return .suspended(
                 AgentToolPlanSuspension(
                     path: record.path,
                     callID: record.call.id,
                     attemptNumber: attemptNumber,
-                    errorDescription: record.errorDescription
+                    reason: .failure(
+                        errorDescription: record.errorDescription
+                    )
                 )
             )
-        }
 
-        return .stopped(
-            result.outcome
-        )
-    }
-
-    func retryState(
-        for result: AgentToolPlanResult,
-        suspension: AgentToolPlanSuspension,
-        attemptNumber: Int
-    ) -> AgentToolPlanRunState {
-        if result.outcome == .succeeded {
-            return .recovered(
-                AgentToolPlanRecoveryPoint(
-                    path: suspension.path,
-                    callID: suspension.callID,
-                    resolvedAttemptNumber: attemptNumber
-                )
-            )
-        }
-
-        if result.outcome == .failed,
-           let record = result.records.last(
+        case .needs_human_review:
+            guard let record = result.records.last(
                 where: {
-                    $0.outcome == .failed
+                    $0.outcome == .needs_human_review
                 }
-           )
-        {
+            ) else {
+                return .stopped(
+                    .needs_human_review
+                )
+            }
+
             return .suspended(
                 AgentToolPlanSuspension(
-                    path: remapRetryPath(
-                        record.path,
-                        beneath: suspension.path
-                    ),
+                    path: record.path,
                     callID: record.call.id,
                     attemptNumber: attemptNumber,
-                    errorDescription: record.errorDescription
+                    reason: .human_review
                 )
             )
+
+        case .denied,
+             .skipped,
+             .mixed:
+            return .stopped(
+                result.outcome
+            )
+        }
+    }
+
+    func resolvedState(
+        plan: AgentToolPlan,
+        suspension: AgentToolPlanSuspension,
+        resolution: AgentToolPlanResolution,
+        attemptNumber: Int
+    ) -> AgentToolPlanRunState {
+        let continuation = plan.root.sequenceContinuation(
+            afterCallID: suspension.callID,
+            path: "root"
+        )
+
+        if let continuation,
+           continuation.isEmpty
+        {
+            return .completed
         }
 
-        return .stopped(
-            result.outcome
+        return .suspended(
+            AgentToolPlanSuspension(
+                path: suspension.path,
+                callID: suspension.callID,
+                attemptNumber: attemptNumber,
+                reason: .continuation_required(
+                    resolution
+                )
+            )
         )
     }
 
-    func remapRetryPath(
+    func executeContinuation(
+        _ continuation: [AgentToolPlanContinuationStep],
+        plan: AgentToolPlan,
+        attemptNumber: Int,
+        context: AgentToolExecutionContext,
+        approvalHandler: (any ToolApprovalHandler)?
+    ) async throws -> AgentToolPlanResult {
+        var records: [AgentToolPlanRecord] = []
+
+        for (
+            index,
+            step
+        ) in continuation.enumerated() {
+            let continuationPlan = AgentToolPlan(
+                id: "\(plan.id).resume.\(attemptNumber).\(index + 1)",
+                root: step.node,
+                guidelineRelations: plan.guidelineRelations
+            )
+            let rawResult = try await planExecutor.execute(
+                continuationPlan,
+                context: context,
+                approvalHandler: approvalHandler
+            )
+            let result = remap(
+                rawResult,
+                beneath: step.path
+            )
+
+            records.append(
+                contentsOf: result.records
+            )
+
+            guard result.outcome == .succeeded else {
+                return AgentToolPlanResult(
+                    planID: "\(plan.id).resume.\(attemptNumber)",
+                    outcome: result.outcome,
+                    records: records
+                )
+            }
+        }
+
+        return AgentToolPlanResult(
+            planID: "\(plan.id).resume.\(attemptNumber)",
+            outcome: .succeeded,
+            records: records
+        )
+    }
+
+    func remap(
+        _ result: AgentToolPlanResult,
+        beneath path: String
+    ) -> AgentToolPlanResult {
+        AgentToolPlanResult(
+            planID: result.planID,
+            outcome: result.outcome,
+            records: result.records.map { record in
+                AgentToolPlanRecord(
+                    path: remapPath(
+                        record.path,
+                        beneath: path
+                    ),
+                    call: record.call,
+                    outcome: record.outcome,
+                    invocation: record.invocation,
+                    errorDescription: record.errorDescription,
+                    skipReason: record.skipReason
+                )
+            }
+        )
+    }
+
+    func remapPath(
         _ path: String,
         beneath originalPath: String
     ) -> String {
@@ -225,6 +484,13 @@ private extension AgentToolPlanRunExecutor {
                 )
             )
     }
+}
+
+private struct AgentToolPlanContinuationStep:
+    Sendable
+{
+    let path: String
+    let node: AgentToolPlanNode
 }
 
 private extension AgentToolPlanNode {
@@ -260,6 +526,66 @@ private extension AgentToolPlanNode {
                     containingCallID: callID
                 )
             }.first
+        }
+    }
+
+    /// Derive untouched continuation only through ordinary sequence ancestry.
+    ///
+    /// Returning nil means the call exists only through ancestry whose resume
+    /// semantics are intentionally not inferred yet, such as batch or an
+    /// outcome branch. Returning an empty array means the call is a supported
+    /// continuation point but nothing follows it.
+    func sequenceContinuation(
+        afterCallID callID: String,
+        path: String
+    ) -> [AgentToolPlanContinuationStep]? {
+        switch self {
+        case .call(
+            let call,
+            _,
+            _,
+            _,
+            _
+        ):
+            return call.id == callID
+                ? []
+                : nil
+
+        case .sequence(let children):
+            for (
+                index,
+                child
+            ) in children.enumerated() {
+                let childPath =
+                    "\(path).sequence[\(index)]"
+
+                guard let nested = child.sequenceContinuation(
+                    afterCallID: callID,
+                    path: childPath
+                ) else {
+                    continue
+                }
+
+                let remaining = children.indices.compactMap {
+                    remainingIndex -> AgentToolPlanContinuationStep? in
+
+                    guard remainingIndex > index else {
+                        return nil
+                    }
+
+                    return AgentToolPlanContinuationStep(
+                        path: "\(path).sequence[\(remainingIndex)]",
+                        node: children[remainingIndex]
+                    )
+                }
+
+                return nested + remaining
+            }
+
+            return nil
+
+        case .batch:
+            return nil
         }
     }
 }

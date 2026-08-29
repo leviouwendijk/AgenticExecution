@@ -1,22 +1,274 @@
 import Agentic
 import AgenticExecution
-import Foundation
 import Primitives
 import TestFlows
+import Foundation
 
 enum AgenticExecutionFlowTesting {
-    static func runToolPlanSuspensionAndRetry() async throws -> [TestFlowDiagnostic] {
-        let probe = RetriableToolProbe()
+    static func runToolPlanRetryAndResume() async throws -> [TestFlowDiagnostic] {
+        let fixture = try makeFixture()
+        let initial = try await fixture.executor.start(
+            fixture.plan,
+            runID: "retry-resume-run"
+        )
 
+        guard case .suspended(let initialSuspension) = initial.state else {
+            throw AgenticExecutionFlowError.unexpectedRunState
+        }
+
+        guard case .failure = initialSuspension.reason else {
+            throw AgenticExecutionFlowError.unexpectedSuspensionReason
+        }
+
+        try Expect.equal(
+            initialSuspension.path,
+            "root.sequence[1]",
+            "initial failure path"
+        )
+
+        try Expect.equal(
+            initialSuspension.callID,
+            "repair",
+            "initial failed call"
+        )
+
+        try Expect.equal(
+            await fixture.probe.invocationLog(),
+            "prefix,repair",
+            "failure stops untouched suffix"
+        )
+
+        let retried = try await fixture.executor.retry(
+            initial
+        )
+
+        guard case .suspended(let retrySuspension) = retried.state else {
+            throw AgenticExecutionFlowError.unexpectedRunState
+        }
+
+        guard case .continuation_required(let retryResolution) = retrySuspension.reason else {
+            throw AgenticExecutionFlowError.unexpectedSuspensionReason
+        }
+
+        guard case .retried(let resolvedAttemptNumber) = retryResolution.kind else {
+            throw AgenticExecutionFlowError.unexpectedResolution
+        }
+
+        try Expect.equal(
+            resolvedAttemptNumber,
+            2,
+            "retry resolution attempt"
+        )
+
+        try Expect.equal(
+            retryResolution.path,
+            "root.sequence[1]",
+            "retry resolution retains parent path"
+        )
+
+        try Expect.equal(
+            await fixture.probe.invocationLog(),
+            "prefix,repair,repair",
+            "retry executes failed node only"
+        )
+
+        try Expect.equal(
+            retried.attempts.count,
+            2,
+            "retry adds one execution attempt"
+        )
+
+        try Expect.equal(
+            retried.resolutions.count,
+            1,
+            "successful retry records explicit resolution"
+        )
+
+        try Expect.equal(
+            retried.revision,
+            2,
+            "retry advances run revision"
+        )
+
+        let resumed = try await fixture.executor.resume(
+            retried
+        )
+
+        guard case .completed = resumed.state else {
+            throw AgenticExecutionFlowError.unexpectedRunState
+        }
+
+        try Expect.equal(
+            await fixture.probe.invocationLog(),
+            "prefix,repair,repair,suffix",
+            "resume executes untouched suffix only"
+        )
+
+        try Expect.equal(
+            resumed.attempts.count,
+            3,
+            "resume adds continuation execution attempt"
+        )
+
+        try Expect.equal(
+            resumed.revision,
+            3,
+            "resume advances run revision"
+        )
+
+        try Expect.equal(
+            resumed.plan,
+            fixture.plan,
+            "semantic parent plan remains immutable"
+        )
+
+        let encoded = try JSONEncoder().encode(
+            resumed
+        )
+        let decoded = try JSONDecoder().decode(
+            AgentToolPlanRun.self,
+            from: encoded
+        )
+
+        try Expect.equal(
+            decoded,
+            resumed,
+            "resumed tool-plan run codable round trip"
+        )
+
+        return [
+            .field(
+                "state",
+                "completed"
+            ),
+            .field(
+                "attempts",
+                "\(resumed.attempts.count)"
+            ),
+            .field(
+                "revision",
+                "\(resumed.revision)"
+            ),
+        ]
+    }
+
+    static func runToolPlanSkipAndResume() async throws -> [TestFlowDiagnostic] {
+        let fixture = try makeFixture()
+        let initial = try await fixture.executor.start(
+            fixture.plan,
+            runID: "skip-resume-run"
+        )
+
+        guard case .suspended = initial.state else {
+            throw AgenticExecutionFlowError.unexpectedRunState
+        }
+
+        let skipped = try fixture.executor.skip(
+            initial
+        )
+
+        guard case .suspended(let skippedSuspension) = skipped.state else {
+            throw AgenticExecutionFlowError.unexpectedRunState
+        }
+
+        guard case .continuation_required(let skipResolution) = skippedSuspension.reason else {
+            throw AgenticExecutionFlowError.unexpectedSuspensionReason
+        }
+
+        guard case .skipped = skipResolution.kind else {
+            throw AgenticExecutionFlowError.unexpectedResolution
+        }
+
+        try Expect.equal(
+            skipped.attempts.count,
+            1,
+            "skip does not execute interrupted node"
+        )
+
+        try Expect.equal(
+            skipped.resolutions.count,
+            1,
+            "skip records explicit resolution"
+        )
+
+        try Expect.equal(
+            skipped.revision,
+            2,
+            "skip advances revision without execution"
+        )
+
+        try Expect.equal(
+            await fixture.probe.invocationLog(),
+            "prefix,repair",
+            "skip leaves failed node unexecuted after external repair"
+        )
+
+        let resumed = try await fixture.executor.resume(
+            skipped
+        )
+
+        guard case .completed = resumed.state else {
+            throw AgenticExecutionFlowError.unexpectedRunState
+        }
+
+        try Expect.equal(
+            await fixture.probe.invocationLog(),
+            "prefix,repair,suffix",
+            "resume after skip executes suffix without replay"
+        )
+
+        try Expect.equal(
+            resumed.attempts.count,
+            2,
+            "skip plus resume has only initial and continuation executions"
+        )
+
+        try Expect.equal(
+            resumed.resolutions.count,
+            1,
+            "skip resolution remains in run history"
+        )
+
+        try Expect.equal(
+            resumed.revision,
+            3,
+            "skip and resume produce distinct run revisions"
+        )
+
+        return [
+            .field(
+                "state",
+                "completed"
+            ),
+            .field(
+                "resolution",
+                "skipped"
+            ),
+            .field(
+                "revision",
+                "\(resumed.revision)"
+            ),
+        ]
+    }
+}
+
+private extension AgenticExecutionFlowTesting {
+    struct Fixture {
+        let executor: AgentToolPlanRunExecutor
+        let plan: AgentToolPlan
+        let probe: PlanRunProbe
+    }
+
+    static func makeFixture() throws -> Fixture {
+        let probe = PlanRunProbe()
         let tool = ClosureAgentTool(
-            identifier: "tool_plan_retry_probe",
-            description: "Fails its first invocation and succeeds thereafter."
+            identifier: "tool_plan_run_probe",
+            description: "Records execution order and fails the repair marker once."
         ) { value, _ in
             try await probe.invoke(
                 value
             )
         }
-
         let invoker = ToolInvoker(
             registry: ToolRegistry(
                 tools: [
@@ -27,220 +279,88 @@ enum AgenticExecutionFlowTesting {
                 autonomyMode: .auto_observe
             )
         )
-
-        let input = try JSONToolBridge.encode(
-            RetryProbeInput(
-                marker: "retry"
+        let prefix = AgentToolCall(
+            id: "prefix",
+            name: "tool_plan_run_probe",
+            input: try JSONToolBridge.encode(
+                RunProbeInput(
+                    marker: "prefix"
+                )
             )
         )
-
-        let first = AgentToolCall(
-            id: "retry-first",
-            name: "tool_plan_retry_probe",
-            input: input
+        let repair = AgentToolCall(
+            id: "repair",
+            name: "tool_plan_run_probe",
+            input: try JSONToolBridge.encode(
+                RunProbeInput(
+                    marker: "repair"
+                )
+            )
         )
-
-        let pending = AgentToolCall(
-            id: "retry-pending",
-            name: "tool_plan_retry_probe",
-            input: input
+        let suffix = AgentToolCall(
+            id: "suffix",
+            name: "tool_plan_run_probe",
+            input: try JSONToolBridge.encode(
+                RunProbeInput(
+                    marker: "suffix"
+                )
+            )
         )
-
         let plan = AgentToolPlan(
             id: "resumable-plan-probe",
             root: .sequence(
                 [
-                    .call(first),
-                    .call(pending),
+                    .call(prefix),
+                    .call(repair),
+                    .call(suffix),
                 ]
             )
         )
 
-        let executor = AgentToolPlanRunExecutor(
-            invoker: invoker
-        )
-
-        let initial = try await executor.start(
-            plan,
-            runID: "resumable-run-probe"
-        )
-
-        guard case .suspended(let suspension) = initial.state else {
-            throw AgenticExecutionFlowError.unexpectedRunState
-        }
-
-        try Expect.equal(
-            suspension.path,
-            "root.sequence[0]",
-            "initial suspension path"
-        )
-
-        try Expect.equal(
-            suspension.callID,
-            first.id,
-            "initial suspended call"
-        )
-
-        try Expect.equal(
-            suspension.attemptNumber,
-            1,
-            "initial suspension attempt"
-        )
-
-        guard let initialResult = initial.latestResult else {
-            throw AgenticExecutionFlowError.missingResult
-        }
-
-        let initialOutcomes: [AgentToolPlanOutcome] =
-            initialResult.records.map { record in
-                record.outcome
-            }
-
-        try Expect.equal(
-            initialOutcomes,
-            [
-                .failed,
-                .skipped,
-            ],
-            "one-shot executor records blocked suffix"
-        )
-
-        try Expect.equal(
-            await probe.invocationCount(),
-            1,
-            "pending parent node did not execute after failure"
-        )
-
-        let retried = try await executor.retry(
-            initial
-        )
-
-        guard case .recovered(let recovery) = retried.state else {
-            throw AgenticExecutionFlowError.unexpectedRunState
-        }
-
-        try Expect.equal(
-            recovery.path,
-            suspension.path,
-            "recovered original path"
-        )
-
-        try Expect.equal(
-            recovery.callID,
-            suspension.callID,
-            "recovered original call"
-        )
-
-        try Expect.equal(
-            recovery.resolvedAttemptNumber,
-            2,
-            "retry attempt number"
-        )
-
-        let attemptNumbers: [Int] =
-            retried.attempts.map { attempt in
-                attempt.number
-            }
-
-        try Expect.equal(
-            attemptNumbers,
-            [
-                1,
-                2,
-            ],
-            "attempt history retained"
-        )
-
-        try Expect.equal(
-            retried.revision,
-            2,
-            "run revision follows attempt history"
-        )
-
-        try Expect.equal(
-            retried.plan,
-            plan,
-            "semantic parent plan remains unchanged"
-        )
-
-        try Expect.equal(
-            await probe.invocationCount(),
-            2,
-            "successful retry does not automatically resume pending parent suffix"
-        )
-
-        let encoded = try JSONEncoder().encode(
-            retried
-        )
-
-        let decoded = try JSONDecoder().decode(
-            AgentToolPlanRun.self,
-            from: encoded
-        )
-
-        try Expect.equal(
-            decoded,
-            retried,
-            "tool-plan run codable round trip"
-        )
-
-        let relationship = AgentToolPlanRunRelationship.recovery(
-            parentRunID: retried.id
-        )
-
-        let relationshipData = try JSONEncoder().encode(
-            relationship
-        )
-
-        let decodedRelationship = try JSONDecoder().decode(
-            AgentToolPlanRunRelationship.self,
-            from: relationshipData
-        )
-
-        try Expect.equal(
-            decodedRelationship,
-            relationship,
-            "recovery relationship codable round trip"
-        )
-
-        return [
-            .field(
-                "state",
-                "recovered"
+        return Fixture(
+            executor: AgentToolPlanRunExecutor(
+                invoker: invoker
             ),
-            .field(
-                "attempts",
-                "\(retried.attempts.count)"
-            ),
-            .field(
-                "revision",
-                "\(retried.revision)"
-            ),
-        ]
+            plan: plan,
+            probe: probe
+        )
     }
 }
 
-private actor RetriableToolProbe {
-    private var count = 0
+private actor PlanRunProbe {
+    private var invocations: [String] = []
+    private var repairFailed = false
 
     func invoke(
         _ value: JSONValue
     ) throws -> JSONValue {
-        count += 1
+        let input = try JSONToolBridge.decode(
+            RunProbeInput.self,
+            from: value
+        )
 
-        if count == 1 {
-            throw RetryProbeError.firstAttempt
+        invocations.append(
+            input.marker
+        )
+
+        if input.marker == "repair",
+           !repairFailed
+        {
+            repairFailed = true
+            throw RunProbeError.firstRepairAttempt
         }
 
         return value
     }
 
-    func invocationCount() -> Int {
-        count
+    func invocationLog() -> String {
+        invocations.joined(
+            separator: ","
+        )
     }
 }
 
-private struct RetryProbeInput:
+private struct RunProbeInput:
     Sendable,
     Codable,
     Hashable
@@ -248,11 +368,12 @@ private struct RetryProbeInput:
     let marker: String
 }
 
-private enum RetryProbeError: Error {
-    case firstAttempt
+private enum RunProbeError: Error {
+    case firstRepairAttempt
 }
 
 private enum AgenticExecutionFlowError: Error {
-    case missingResult
     case unexpectedRunState
+    case unexpectedSuspensionReason
+    case unexpectedResolution
 }
