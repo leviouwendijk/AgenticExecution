@@ -172,9 +172,11 @@ private extension AgentToolPlanExecutor {
         case .needs_human_review:
             finalOutcome = .needs_human_review
 
-        case .skipped,
-             .mixed:
-            finalOutcome = outcome
+        case .skipped:
+            finalOutcome = .succeeded
+
+        case .mixed:
+            finalOutcome = .mixed
         }
 
         return .init(
@@ -399,6 +401,9 @@ private extension AgentToolPlanExecutor {
 
         case .denied:
             return .denied
+
+        case .skipped:
+            return .skipped
 
         case .needshuman:
             return .needs_human_review

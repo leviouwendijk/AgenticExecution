@@ -138,13 +138,26 @@ public struct AgentToolPlanRunExecutor:
         let nextState: AgentToolPlanRunState
 
         if result.outcome == .succeeded {
+            let resolutionKind: AgentToolPlanResolution.Kind
+
+            if result.records.contains(
+                where: { record in
+                    record.path == suspension.path
+                        && record.outcome == .skipped
+                }
+            ) {
+                resolutionKind = .skipped
+            } else {
+                resolutionKind = .retried(
+                    attemptNumber: attemptNumber
+                )
+            }
+
             let resolution = AgentToolPlanResolution(
                 revision: revision,
                 path: suspension.path,
                 callID: suspension.callID,
-                kind: .retried(
-                    attemptNumber: attemptNumber
-                )
+                kind: resolutionKind
             )
 
             resolutions.append(

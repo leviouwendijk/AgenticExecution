@@ -41,5 +41,18 @@ enum AgenticExecutionFlowSuite: TestFlowRegistry {
             try await AgenticExecutionFlowTesting
                 .runToolPlanSkipAndResume()
         },
+        TestFlow(
+            "tool-plan-approval-skip-continues",
+            tags: [
+                "agentic-execution",
+                "tool-plan",
+                "approval",
+                "skip",
+                "continuation",
+            ]
+        ) {
+            try await AgenticExecutionFlowTesting
+                .runToolPlanApprovalSkip()
+        },
     ]
 }

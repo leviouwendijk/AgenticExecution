@@ -250,6 +250,139 @@ enum AgenticExecutionFlowTesting {
             ),
         ]
     }
+
+    static func runToolPlanApprovalSkip() async throws -> [TestFlowDiagnostic] {
+        let probe = PlanRunProbe()
+        let tool = ClosureAgentTool(
+            identifier: "tool_plan_approval_skip_probe",
+            description: "Records ToolPlan execution while one reviewed call is explicitly skipped.",
+            risk: .boundedmutate
+        ) { value, _ in
+            try await probe.invoke(
+                value
+            )
+        }
+        let invoker = ToolInvoker(
+            registry: ToolRegistry(
+                tools: [
+                    tool,
+                ]
+            ),
+            policy: ToolExecutionPolicy(
+                autonomyMode: .auto_observe
+            )
+        )
+        let executor = AgentToolPlanRunExecutor(
+            invoker: invoker
+        )
+        let plan = AgentToolPlan(
+            id: "approval-skip-plan",
+            root: .sequence(
+                [
+                    .call(
+                        AgentToolCall(
+                            id: "approval-prefix",
+                            name: "tool_plan_approval_skip_probe",
+                            input: try JSONToolBridge.encode(
+                                RunProbeInput(
+                                    marker: "approval-prefix"
+                                )
+                            )
+                        )
+                    ),
+                    .call(
+                        AgentToolCall(
+                            id: "approval-skip",
+                            name: "tool_plan_approval_skip_probe",
+                            input: try JSONToolBridge.encode(
+                                RunProbeInput(
+                                    marker: "approval-skip"
+                                )
+                            )
+                        )
+                    ),
+                    .call(
+                        AgentToolCall(
+                            id: "approval-suffix",
+                            name: "tool_plan_approval_skip_probe",
+                            input: try JSONToolBridge.encode(
+                                RunProbeInput(
+                                    marker: "approval-suffix"
+                                )
+                            )
+                        )
+                    ),
+                ]
+            )
+        )
+
+        let run = try await executor.start(
+            plan,
+            runID: "approval-skip-run",
+            approvalHandler: SelectiveSkipApprovalHandler(
+                skippedCallID: "approval-skip"
+            )
+        )
+
+        guard case .completed = run.state else {
+            throw AgenticExecutionFlowError.unexpectedRunState
+        }
+
+        try Expect.equal(
+            await probe.invocationLog(),
+            "approval-prefix,approval-suffix",
+            "ordinary approval skip omits only selected node and continues suffix"
+        )
+
+        guard let result = run.attempts.first?.result else {
+            throw AgenticExecutionFlowError.unexpectedRunState
+        }
+
+        try Expect.equal(
+            result.outcome,
+            .succeeded,
+            "ordinary skipped node keeps enclosing sequence viable"
+        )
+        try Expect.equal(
+            result.records.filter {
+                $0.path.hasPrefix("root.sequence")
+                    && !$0.path.contains(".on")
+            }.map(\.outcome),
+            [
+                .succeeded,
+                .skipped,
+                .succeeded,
+            ],
+            "ordinary skip remains visible in execution records"
+        )
+
+        return [
+            .field(
+                "state",
+                "completed"
+            ),
+            .field(
+                "executed",
+                "\(result.executedCount)"
+            ),
+            .field(
+                "skipped",
+                "\(result.skippedCount)"
+            ),
+        ]
+    }
+}
+
+private struct SelectiveSkipApprovalHandler: ToolApprovalHandler {
+    let skippedCallID: String
+
+    func decide(
+        on review: ToolInvocation.Review
+    ) async throws -> ApprovalDecision {
+        review.call.id == skippedCallID
+            ? .skipped
+            : .approved
+    }
 }
 
 private extension AgenticExecutionFlowTesting {
