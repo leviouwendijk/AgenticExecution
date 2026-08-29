@@ -3,29 +3,46 @@ import AgenticWorkspace
 import Primitives
 
 public struct ToolRegistry: Sendable {
-    private var tools: [AgentToolIdentifier: any AgentTool]
+    private var tools:
+        [AgentToolIdentifier: RegisteredAgentTool]
 
     public init(
         tools: [any AgentTool] = []
     ) {
         self.tools = Dictionary(
-            uniqueKeysWithValues: tools.map { tool in
-                (tool.identifier, tool)
-            }
+            uniqueKeysWithValues:
+                tools.map { tool in
+                    let registered =
+                        RegisteredAgentTool(
+                            tool
+                        )
+
+                    return (
+                        tool.identifier,
+                        registered
+                    )
+                }
         )
     }
 
     public var definitions: [AgentToolDefinition] {
-        tools.values.map(\.definition).sorted { lhs, rhs in
-            lhs.name < rhs.name
-        }
+        tools.values
+            .map(
+                \.capability.definition
+            )
+            .sorted { lhs, rhs in
+                lhs.name < rhs.name
+            }
     }
 
     public var capabilities: [AgentToolCapability] {
         tools.values
-            .map(AgentToolCapability.init(tool:))
+            .map(
+                \.capability
+            )
             .sorted { lhs, rhs in
-                lhs.definition.name < rhs.definition.name
+                lhs.definition.name
+                    < rhs.definition.name
             }
     }
 
@@ -48,14 +65,19 @@ public struct ToolRegistry: Sendable {
             )
         }
 
-        tools[identifier] = tool
+        tools[identifier] =
+            RegisteredAgentTool(
+                tool
+            )
     }
 
     public mutating func register(
         _ tools: [any AgentTool]
     ) throws {
         for tool in tools {
-            try register(tool)
+            try register(
+                tool
+            )
         }
     }
 
@@ -75,18 +97,61 @@ public struct ToolRegistry: Sendable {
         )
     }
 
+    public func registeredTool(
+        identifiedBy identifier: AgentToolIdentifier
+    ) -> RegisteredAgentTool? {
+        tools[identifier]
+    }
+
+    public func registeredTool(
+        named name: String
+    ) -> RegisteredAgentTool? {
+        registeredTool(
+            identifiedBy:
+                .init(
+                    name
+                )
+        )
+    }
+
     public func tool(
         identifiedBy identifier: AgentToolIdentifier
     ) -> (any AgentTool)? {
-        tools[identifier]
+        registeredTool(
+            identifiedBy: identifier
+        )?
+        .tool
     }
 
     public func tool(
         named name: String
     ) -> (any AgentTool)? {
-        tool(
-            identifiedBy: .init(name)
-        )
+        registeredTool(
+            named: name
+        )?
+        .tool
+    }
+
+    public func parseModelCall(
+        _ call: AgentToolCall
+    ) throws -> ParsedAgentToolCall {
+        guard let registered =
+            registeredTool(
+                named: call.name
+            )
+        else {
+            throw RegisteredAgentToolError
+                .invalidModelCall(
+                    tool: call.name,
+                    reason:
+                        "No registered tool has this identifier."
+                )
+        }
+
+        return try registered
+            .parseModelCall(
+                call
+            )
     }
 
     public func preflight(
@@ -105,15 +170,20 @@ public struct ToolRegistry: Sendable {
         _ toolCall: AgentToolCall,
         context: AgentToolExecutionContext
     ) async throws -> ToolPreflight {
-        guard let tool = tool(named: toolCall.name) else {
-            throw ToolDispatchError.unknownTool(toolCall.name)
+        guard let tool = tool(
+            named: toolCall.name
+        ) else {
+            throw ToolDispatchError.unknownTool(
+                toolCall.name
+            )
         }
 
         return try await tool.preflight(
             input: toolCall.input,
-            context: context.withToolCallID(
-                toolCall.id
-            )
+            context:
+                context.withToolCallID(
+                    toolCall.id
+                )
         )
     }
 
@@ -121,8 +191,12 @@ public struct ToolRegistry: Sendable {
         _ toolCall: AgentToolCall,
         workspace: AgentWorkspace?
     ) async throws -> AgentToolResult {
-        guard let tool = tool(named: toolCall.name) else {
-            throw ToolDispatchError.unknownTool(toolCall.name)
+        guard let tool = tool(
+            named: toolCall.name
+        ) else {
+            throw ToolDispatchError.unknownTool(
+                toolCall.name
+            )
         }
 
         let output: JSONValue
@@ -134,7 +208,9 @@ public struct ToolRegistry: Sendable {
                 workspace: workspace
             )
             isError = false
-        } catch let failure as AgentToolReportedFailure {
+        } catch let failure
+            as AgentToolReportedFailure
+        {
             output = failure.output
             isError = true
         }

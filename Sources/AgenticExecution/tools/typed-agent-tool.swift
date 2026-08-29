@@ -1,16 +1,12 @@
 import Primitives
 import Schema
 
-/// An AgentTool whose model-facing input contract remains semantic until transport lowering.
-public protocol SchemaBackedAgentTool:
-    AgentTool
-{
-    var semanticInputSchema: JSONSchema { get }
-}
-
-/// Schema-backed contract for stateful/instance AgentTool implementations.
+/// Schema-backed contract for stateful AgentTool implementations.
+///
+/// This is one of the two typed tool authoring contracts. ToolRegistry captures
+/// its semantic schema and typed parser once through registrationDescriptor.
 public protocol TypedInstanceAgentTool:
-    SchemaBackedAgentTool
+    AgentTool
 {
     associatedtype Input:
         Decodable &
@@ -26,13 +22,21 @@ public extension TypedInstanceAgentTool {
     var inputSchema: JSONValue? {
         semanticInputSchema.jsonvalue
     }
+
+    var registrationDescriptor: AgentToolRegistrationDescriptor {
+        .modelFacing(
+            Input.self
+        )
+    }
 }
 
-
-/// Schema-backed contract for static tools that only need automatic input-schema projection.
-public protocol StaticSchemaAgentTool:
-    StaticAgentTool,
-    SchemaBackedAgentTool
+/// Schema-backed contract for static AgentTool implementations.
+///
+/// StaticAgentTool remains the metadata convenience. TypedAgentTool adds one
+/// concrete model-facing Input; output typing remains an implementation detail
+/// of the individual tool.
+public protocol TypedAgentTool:
+    StaticAgentTool
 {
     associatedtype Input:
         Decodable &
@@ -40,7 +44,7 @@ public protocol StaticSchemaAgentTool:
         JSONSchemaProviding
 }
 
-public extension StaticSchemaAgentTool {
+public extension TypedAgentTool {
     static var semanticInputSchema: JSONSchema {
         Input.jsonschema
     }
@@ -52,13 +56,14 @@ public extension StaticSchemaAgentTool {
     var semanticInputSchema: JSONSchema {
         Self.semanticInputSchema
     }
+
+    var registrationDescriptor: AgentToolRegistrationDescriptor {
+        .modelFacing(
+            Input.self
+        )
+    }
 }
 
-/// Schema-backed typed contract for static AgentTool implementations.
-public protocol TypedAgentTool:
-    StaticSchemaAgentTool
-{
-    associatedtype Output:
-        Encodable &
-        Sendable
-}
+/// Compatibility spelling for static schema-backed tools migrated before the
+/// typed contract cleanup. This is an alias, not another tool protocol.
+public typealias StaticSchemaAgentTool = TypedAgentTool

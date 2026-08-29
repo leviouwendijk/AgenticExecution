@@ -7,6 +7,7 @@ public protocol AgentTool: Sendable {
     var description: String { get }
     var inputSchema: JSONValue? { get }
     var risk: ActionRisk { get }
+    var registrationDescriptor: AgentToolRegistrationDescriptor { get }
 
     func processResult(
         input: JSONValue,
@@ -36,6 +37,10 @@ public protocol AgentTool: Sendable {
 }
 
 public extension AgentTool {
+    var registrationDescriptor: AgentToolRegistrationDescriptor {
+        .hostOnly
+    }
+
     var inputSchema: JSONValue? {
         nil
     }

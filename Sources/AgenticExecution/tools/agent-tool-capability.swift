@@ -1,34 +1,29 @@
 import Agentic
 import Schema
 
-/// Host-facing execution capability projected from one registered tool.
-/// Execution metadata remains separate from the semantic AgentToolDefinition.
-public struct AgentToolCapability: Sendable {
+/// Host-facing execution capability captured from one RegisteredAgentTool.
+public struct AgentToolCapability:
+    Sendable
+{
     public let definition: AgentToolDefinition
-    public let semanticInputSchema: JSONSchema?
+    public let modelContract: AgentToolModelContract
     public let supportsWorkspaceTargeting: Bool
 
     public init(
         definition: AgentToolDefinition,
-        semanticInputSchema: JSONSchema?,
+        modelContract: AgentToolModelContract,
         supportsWorkspaceTargeting: Bool
     ) {
         self.definition = definition
-        self.semanticInputSchema = semanticInputSchema
+        self.modelContract = modelContract
         self.supportsWorkspaceTargeting = supportsWorkspaceTargeting
     }
-}
 
-public extension AgentToolCapability {
-    init(
-        tool: any AgentTool
-    ) {
-        self.init(
-            definition: tool.definition,
-            semanticInputSchema: (tool as? any SchemaBackedAgentTool)?
-                .semanticInputSchema,
-            supportsWorkspaceTargeting:
-                tool is any WorkspaceTargetableTool
-        )
+    public var semanticInputSchema: JSONSchema? {
+        modelContract.semanticInputSchema
+    }
+
+    public var isModelFacing: Bool {
+        modelContract.isModelFacing
     }
 }

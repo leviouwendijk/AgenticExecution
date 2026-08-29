@@ -7,6 +7,7 @@ public struct ClosureAgentTool: AgentTool {
     public var description: String
     public var inputSchema: JSONValue?
     public var risk: ActionRisk
+    public var registrationDescriptor: AgentToolRegistrationDescriptor
 
     private var customPreflightHandler: AgentToolPreflightHandler?
     private let callHandler: AgentToolCallHandler
@@ -16,6 +17,7 @@ public struct ClosureAgentTool: AgentTool {
         description: String = "",
         inputSchema: JSONValue? = nil,
         risk: ActionRisk = .observe,
+        registrationDescriptor: AgentToolRegistrationDescriptor = .hostOnly,
         preflight: AgentToolPreflightHandler? = nil,
         call: @escaping AgentToolCallHandler
     ) {
@@ -23,6 +25,7 @@ public struct ClosureAgentTool: AgentTool {
         self.description = description
         self.inputSchema = inputSchema
         self.risk = risk
+        self.registrationDescriptor = registrationDescriptor
         self.customPreflightHandler = preflight
         self.callHandler = call
     }
@@ -146,7 +149,11 @@ public func tool<Input, Output>(
         inputSchema:
             inputSchema
                 ?? derivedAgentToolInputSchema(Input.self),
-        risk: risk
+        risk: risk,
+        registrationDescriptor:
+            derivedAgentToolRegistration(
+                Input.self
+            )
     ) { value, context in
         let decoded = try JSONToolBridge.decode(
             Input.self,
@@ -181,7 +188,11 @@ public func tool<Input, Output>(
         inputSchema:
             inputSchema
                 ?? derivedAgentToolInputSchema(Input.self),
-        risk: risk
+        risk: risk,
+        registrationDescriptor:
+            derivedAgentToolRegistration(
+                Input.self
+            )
     ) { value, _ in
         let decoded = try JSONToolBridge.decode(
             Input.self,
@@ -241,7 +252,11 @@ public func effectTool<Input>(
         inputSchema:
             inputSchema
                 ?? derivedAgentToolInputSchema(Input.self),
-        risk: risk
+        risk: risk,
+        registrationDescriptor:
+            derivedAgentToolRegistration(
+                Input.self
+            )
     ) { value, context in
         let decoded = try JSONToolBridge.decode(
             Input.self,
@@ -275,7 +290,11 @@ public func effectTool<Input>(
         inputSchema:
             inputSchema
                 ?? derivedAgentToolInputSchema(Input.self),
-        risk: risk
+        risk: risk,
+        registrationDescriptor:
+            derivedAgentToolRegistration(
+                Input.self
+            )
     ) { value, _ in
         let decoded = try JSONToolBridge.decode(
             Input.self,

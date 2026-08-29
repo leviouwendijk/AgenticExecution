@@ -15,7 +15,11 @@ public enum AgentToolDeclarationComponent: Sendable {
     case schema(JSONValue?)
     case risk(ActionRisk)
     case preflight(AgentToolPreflightHandler)
-    case call(AgentToolCallHandler, inputSchema: JSONValue? = nil)
+    case call(
+        AgentToolCallHandler,
+        inputSchema: JSONValue? = nil,
+        registrationDescriptor: AgentToolRegistrationDescriptor = .hostOnly
+    )
 }
 
 public struct AgentToolDeclaration: Sendable {
@@ -36,6 +40,7 @@ public struct AgentToolDeclaration: Sendable {
         var risk: ActionRisk = .observe
         var preflightHandler: AgentToolPreflightHandler?
         var callHandler: AgentToolCallHandler?
+        var registrationDescriptor: AgentToolRegistrationDescriptor = .hostOnly
 
         for component in components {
             switch component {
@@ -51,8 +56,15 @@ public struct AgentToolDeclaration: Sendable {
             case .preflight(let value):
                 preflightHandler = value
 
-            case .call(let value, let derivedSchema):
+            case .call(
+                let value,
+                let derivedSchema,
+                let derivedRegistrationDescriptor
+            ):
                 callHandler = value
+                registrationDescriptor =
+                    derivedRegistrationDescriptor
+
                 if inputSchema == nil {
                     inputSchema = derivedSchema
                 }
@@ -70,6 +82,7 @@ public struct AgentToolDeclaration: Sendable {
             description: description,
             inputSchema: inputSchema,
             risk: risk,
+            registrationDescriptor: registrationDescriptor,
             preflight: preflightHandler,
             call: callHandler
         )
@@ -168,7 +181,15 @@ public extension AgentToolDeclarationComponent {
             return try JSONToolBridge.encode(
                 output
             )
-        }, inputSchema: derivedAgentToolInputSchema(Input.self))
+        }, inputSchema:
+            derivedAgentToolInputSchema(
+                Input.self
+            ),
+            registrationDescriptor:
+                derivedAgentToolRegistration(
+                    Input.self
+                )
+        )
     }
 
     static func call<Input, Output>(
@@ -191,7 +212,15 @@ public extension AgentToolDeclarationComponent {
             return try JSONToolBridge.encode(
                 output
             )
-        }, inputSchema: derivedAgentToolInputSchema(Input.self))
+        }, inputSchema:
+            derivedAgentToolInputSchema(
+                Input.self
+            ),
+            registrationDescriptor:
+                derivedAgentToolRegistration(
+                    Input.self
+                )
+        )
     }
 
     static func call<Output>(
@@ -245,7 +274,15 @@ public extension AgentToolDeclarationComponent {
             return try JSONToolBridge.encode(
                 AgentToolEmptyOutput()
             )
-        }, inputSchema: derivedAgentToolInputSchema(Input.self))
+        }, inputSchema:
+            derivedAgentToolInputSchema(
+                Input.self
+            ),
+            registrationDescriptor:
+                derivedAgentToolRegistration(
+                    Input.self
+                )
+        )
     }
 
     static func effect<Input>(
@@ -267,7 +304,15 @@ public extension AgentToolDeclarationComponent {
             return try JSONToolBridge.encode(
                 AgentToolEmptyOutput()
             )
-        }, inputSchema: derivedAgentToolInputSchema(Input.self))
+        }, inputSchema:
+            derivedAgentToolInputSchema(
+                Input.self
+            ),
+            registrationDescriptor:
+                derivedAgentToolRegistration(
+                    Input.self
+                )
+        )
     }
 
     static func effect(
