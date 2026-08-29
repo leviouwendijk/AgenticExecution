@@ -64,6 +64,3 @@ public extension TypedAgentTool {
     }
 }
 
-/// Compatibility spelling for static schema-backed tools migrated before the
-/// typed contract cleanup. This is an alias, not another tool protocol.
-public typealias StaticSchemaAgentTool = TypedAgentTool
