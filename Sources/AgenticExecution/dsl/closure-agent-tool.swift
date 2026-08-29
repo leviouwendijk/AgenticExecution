@@ -143,7 +143,9 @@ public func tool<Input, Output>(
     ClosureAgentTool(
         identifier: identifier,
         description: description,
-        inputSchema: inputSchema,
+        inputSchema:
+            inputSchema
+                ?? derivedAgentToolInputSchema(Input.self),
         risk: risk
     ) { value, context in
         let decoded = try JSONToolBridge.decode(
@@ -176,7 +178,9 @@ public func tool<Input, Output>(
     ClosureAgentTool(
         identifier: identifier,
         description: description,
-        inputSchema: inputSchema,
+        inputSchema:
+            inputSchema
+                ?? derivedAgentToolInputSchema(Input.self),
         risk: risk
     ) { value, _ in
         let decoded = try JSONToolBridge.decode(
@@ -234,7 +238,9 @@ public func effectTool<Input>(
     ClosureAgentTool(
         identifier: identifier,
         description: description,
-        inputSchema: inputSchema,
+        inputSchema:
+            inputSchema
+                ?? derivedAgentToolInputSchema(Input.self),
         risk: risk
     ) { value, context in
         let decoded = try JSONToolBridge.decode(
@@ -266,7 +272,9 @@ public func effectTool<Input>(
     ClosureAgentTool(
         identifier: identifier,
         description: description,
-        inputSchema: inputSchema,
+        inputSchema:
+            inputSchema
+                ?? derivedAgentToolInputSchema(Input.self),
         risk: risk
     ) { value, _ in
         let decoded = try JSONToolBridge.decode(

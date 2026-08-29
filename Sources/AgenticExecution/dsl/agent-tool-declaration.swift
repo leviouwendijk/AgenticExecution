@@ -1,5 +1,6 @@
 import Agentic
 import Primitives
+import Schema
 
 public struct AgentToolEmptyInput: Sendable, Codable, Hashable {
     public init() {}
@@ -14,7 +15,7 @@ public enum AgentToolDeclarationComponent: Sendable {
     case schema(JSONValue?)
     case risk(ActionRisk)
     case preflight(AgentToolPreflightHandler)
-    case call(AgentToolCallHandler)
+    case call(AgentToolCallHandler, inputSchema: JSONValue? = nil)
 }
 
 public struct AgentToolDeclaration: Sendable {
@@ -50,8 +51,11 @@ public struct AgentToolDeclaration: Sendable {
             case .preflight(let value):
                 preflightHandler = value
 
-            case .call(let value):
+            case .call(let value, let derivedSchema):
                 callHandler = value
+                if inputSchema == nil {
+                    inputSchema = derivedSchema
+                }
             }
         }
 
@@ -117,7 +121,7 @@ public extension AgentToolDeclaration {
         _ call: @escaping AgentToolCallHandler
     ) -> Self {
         appending(
-            .call(call)
+            .call(call, inputSchema: nil)
         )
     }
 
@@ -137,7 +141,8 @@ public extension AgentToolDeclarationComponent {
         _ call: @escaping AgentToolCallHandler
     ) -> Self {
         .call(
-            call
+            call,
+            inputSchema: nil
         )
     }
 
@@ -149,7 +154,7 @@ public extension AgentToolDeclarationComponent {
             AgentToolContext
         ) async throws -> Output
     ) -> Self where Input: Decodable & Sendable, Output: Encodable & Sendable {
-        .call { value, context in
+        .call({ value, context in
             let decoded = try JSONToolBridge.decode(
                 Input.self,
                 from: value
@@ -163,7 +168,7 @@ public extension AgentToolDeclarationComponent {
             return try JSONToolBridge.encode(
                 output
             )
-        }
+        }, inputSchema: derivedAgentToolInputSchema(Input.self))
     }
 
     static func call<Input, Output>(
@@ -173,7 +178,7 @@ public extension AgentToolDeclarationComponent {
             Input
         ) async throws -> Output
     ) -> Self where Input: Decodable & Sendable, Output: Encodable & Sendable {
-        .call { value, _ in
+        .call({ value, _ in
             let decoded = try JSONToolBridge.decode(
                 Input.self,
                 from: value
@@ -186,7 +191,7 @@ public extension AgentToolDeclarationComponent {
             return try JSONToolBridge.encode(
                 output
             )
-        }
+        }, inputSchema: derivedAgentToolInputSchema(Input.self))
     }
 
     static func call<Output>(
@@ -226,7 +231,7 @@ public extension AgentToolDeclarationComponent {
             AgentToolContext
         ) async throws -> Void
     ) -> Self where Input: Decodable & Sendable {
-        .call { value, context in
+        .call({ value, context in
             let decoded = try JSONToolBridge.decode(
                 Input.self,
                 from: value
@@ -240,7 +245,7 @@ public extension AgentToolDeclarationComponent {
             return try JSONToolBridge.encode(
                 AgentToolEmptyOutput()
             )
-        }
+        }, inputSchema: derivedAgentToolInputSchema(Input.self))
     }
 
     static func effect<Input>(
@@ -249,7 +254,7 @@ public extension AgentToolDeclarationComponent {
             Input
         ) async throws -> Void
     ) -> Self where Input: Decodable & Sendable {
-        .call { value, _ in
+        .call({ value, _ in
             let decoded = try JSONToolBridge.decode(
                 Input.self,
                 from: value
@@ -262,7 +267,7 @@ public extension AgentToolDeclarationComponent {
             return try JSONToolBridge.encode(
                 AgentToolEmptyOutput()
             )
-        }
+        }, inputSchema: derivedAgentToolInputSchema(Input.self))
     }
 
     static func effect(
@@ -429,7 +434,8 @@ public func raw(
     _ call: @escaping AgentToolCallHandler
 ) -> AgentToolDeclarationComponent {
     .call(
-        call
+        call,
+        inputSchema: nil
     )
 }
 
@@ -437,7 +443,8 @@ public func rawToolCall(
     _ call: @escaping AgentToolCallHandler
 ) -> AgentToolDeclarationComponent {
     .call(
-        call
+        call,
+        inputSchema: nil
     )
 }
 

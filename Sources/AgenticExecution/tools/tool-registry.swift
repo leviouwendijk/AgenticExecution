@@ -21,6 +21,14 @@ public struct ToolRegistry: Sendable {
         }
     }
 
+    public var capabilities: [AgentToolCapability] {
+        tools.values
+            .map(AgentToolCapability.init(tool:))
+            .sorted { lhs, rhs in
+                lhs.definition.name < rhs.definition.name
+            }
+    }
+
     public var isEmpty: Bool {
         tools.isEmpty
     }
