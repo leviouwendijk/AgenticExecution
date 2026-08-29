@@ -14,6 +14,12 @@ let package = Package(
                 "AgenticExecution",
             ]
         ),
+        .executable(
+            name: "aetest",
+            targets: [
+                "AgenticExecutionTestFlows",
+            ]
+        ),
     ],
     dependencies: [
         .package(
@@ -34,6 +40,10 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/leviouwendijk/Difference.git",
+            branch: "master"
+        ),
+        .package(
+            url: "https://github.com/leviouwendijk/TestFlows.git",
             branch: "master"
         ),
     ],
@@ -60,6 +70,24 @@ let package = Package(
                 .product(
                     name: "Difference",
                     package: "Difference"
+                ),
+            ]
+        ),
+        .executableTarget(
+            name: "AgenticExecutionTestFlows",
+            dependencies: [
+                "AgenticExecution",
+                .product(
+                    name: "Agentic",
+                    package: "Agentic"
+                ),
+                .product(
+                    name: "Primitives",
+                    package: "Primitives"
+                ),
+                .product(
+                    name: "TestFlows",
+                    package: "TestFlows"
                 ),
             ]
         ),
