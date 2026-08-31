@@ -42,6 +42,46 @@ enum AgenticExecutionFlowSuite: TestFlowRegistry {
                 .runToolPlanSkipAndResume()
         },
         TestFlow(
+            "tool-plan-execution-policy-model",
+            tags: [
+                "agentic-execution",
+                "tool-plan",
+                "execution-policy",
+                "pause",
+            ]
+        ) {
+            try AgenticExecutionFlowTesting
+                .runToolPlanExecutionPolicyModel()
+        },
+        TestFlow(
+            "tool-plan-single-step-start",
+            tags: [
+                "agentic-execution",
+                "tool-plan",
+                "execution-policy",
+                "single-step",
+                "pause",
+            ]
+        ) {
+            try await AgenticExecutionFlowTesting
+                .runToolPlanSingleStepStart()
+        },
+        TestFlow(
+            "tool-plan-single-step-resume",
+            tags: [
+                "agentic-execution",
+                "tool-plan",
+                "execution-policy",
+                "single-step",
+                "resume",
+                "continuous",
+                "pause",
+            ]
+        ) {
+            try await AgenticExecutionFlowTesting
+                .runToolPlanSingleStepResume()
+        },
+        TestFlow(
             "tool-plan-approval-skip-continues",
             tags: [
                 "agentic-execution",

@@ -138,6 +138,7 @@ public enum AgentToolPlanRunState:
     Hashable
 {
     case completed
+    case paused(AgentToolPlanPause)
     case suspended(AgentToolPlanSuspension)
     case stopped(AgentToolPlanOutcome)
 }

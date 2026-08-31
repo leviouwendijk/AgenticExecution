@@ -5,6 +5,245 @@ import TestFlows
 import Foundation
 
 enum AgenticExecutionFlowTesting {
+    static func runToolPlanExecutionPolicyModel() throws -> [TestFlowDiagnostic] {
+        let pause = AgentToolPlanPause(
+            afterPath: "root.sequence[0]",
+            afterCallID: "first",
+            attemptNumber: 1,
+            reason: .single_step
+        )
+        let state = AgentToolPlanRunState.paused(
+            pause
+        )
+
+        guard AgentToolPlanExecutionPolicy.allCases == [
+            .continuous,
+            .single_step,
+        ] else {
+            throw AgenticExecutionFlowError.unexpectedRunState
+        }
+
+        guard case .paused(let captured) = state,
+              captured.afterPath == "root.sequence[0]",
+              captured.afterCallID == "first",
+              captured.attemptNumber == 1,
+              captured.reason == .single_step else {
+            throw AgenticExecutionFlowError.unexpectedRunState
+        }
+
+        return [
+            .field(
+                "continuous",
+                AgentToolPlanExecutionPolicy.continuous.rawValue
+            ),
+            .field(
+                "single-step",
+                AgentToolPlanExecutionPolicy.single_step.rawValue
+            ),
+            .field(
+                "pause",
+                captured.reason.rawValue
+            ),
+        ]
+    }
+
+    static func runToolPlanSingleStepStart() async throws -> [TestFlowDiagnostic] {
+        let fixture = try makeFixture()
+        let run = try await fixture.executor.start(
+            fixture.plan,
+            runID: "single-step-start",
+            executionPolicy: .single_step
+        )
+
+        guard case .paused(let pause) = run.state,
+              pause.afterPath == "root.sequence[0]",
+              pause.afterCallID == "prefix",
+              pause.attemptNumber == 1,
+              pause.reason == .single_step else {
+            throw AgenticExecutionFlowError.unexpectedRunState
+        }
+
+        try Expect.equal(
+            await fixture.probe.invocationLog(),
+            "prefix",
+            "single-step start executes exactly one authored call"
+        )
+
+        try Expect.equal(
+            run.attempts.count,
+            1,
+            "single-step start records one execution attempt"
+        )
+
+        guard case .node(
+            path: "root.sequence[0]",
+            callID: "prefix"
+        ) = run.attempts[0].scope else {
+            throw AgenticExecutionFlowError.unexpectedRunState
+        }
+
+        return [
+            .field(
+                "state",
+                "paused"
+            ),
+            .field(
+                "after",
+                pause.afterCallID
+            ),
+            .field(
+                "executed",
+                await fixture.probe.invocationLog()
+            ),
+        ]
+    }
+
+    static func runToolPlanSingleStepResume() async throws -> [TestFlowDiagnostic] {
+        let fixture = try makeFixture()
+        let first = AgentToolCall(
+            id: "first",
+            name: "tool_plan_run_probe",
+            input: try JSONToolBridge.encode(
+                RunProbeInput(
+                    marker: "first"
+                )
+            )
+        )
+        let second = AgentToolCall(
+            id: "second",
+            name: "tool_plan_run_probe",
+            input: try JSONToolBridge.encode(
+                RunProbeInput(
+                    marker: "second"
+                )
+            )
+        )
+        let third = AgentToolCall(
+            id: "third",
+            name: "tool_plan_run_probe",
+            input: try JSONToolBridge.encode(
+                RunProbeInput(
+                    marker: "third"
+                )
+            )
+        )
+        let plan = AgentToolPlan(
+            id: "single-step-resume-probe",
+            root: .sequence(
+                [
+                    .call(first),
+                    .call(second),
+                    .call(third),
+                ]
+            )
+        )
+
+        let started = try await fixture.executor.start(
+            plan,
+            runID: "single-step-resume",
+            executionPolicy: .single_step
+        )
+
+        guard case .paused(let firstPause) = started.state,
+              firstPause.afterPath == "root.sequence[0]",
+              firstPause.afterCallID == "first",
+              firstPause.attemptNumber == 1,
+              firstPause.reason == .single_step else {
+            throw AgenticExecutionFlowError.unexpectedRunState
+        }
+
+        try Expect.equal(
+            await fixture.probe.invocationLog(),
+            "first",
+            "single-step start executes first call only"
+        )
+
+        let stepped = try await fixture.executor.resume(
+            started,
+            executionPolicy: .single_step
+        )
+
+        guard case .paused(let secondPause) = stepped.state,
+              secondPause.afterPath == "root.sequence[1]",
+              secondPause.afterCallID == "second",
+              secondPause.attemptNumber == 2,
+              secondPause.reason == .single_step else {
+            throw AgenticExecutionFlowError.unexpectedRunState
+        }
+
+        try Expect.equal(
+            await fixture.probe.invocationLog(),
+            "first,second",
+            "single-step resume executes exactly one additional call"
+        )
+
+        try Expect.equal(
+            stepped.revision,
+            2,
+            "single-step resume advances run revision"
+        )
+
+        guard stepped.attempts.count == 2,
+              case .node(
+                path: "root.sequence[1]",
+                callID: "second"
+              ) = stepped.attempts[1].scope else {
+            throw AgenticExecutionFlowError.unexpectedRunState
+        }
+
+        let completed = try await fixture.executor.resume(
+            stepped,
+            executionPolicy: .continuous
+        )
+
+        guard case .completed = completed.state else {
+            throw AgenticExecutionFlowError.unexpectedRunState
+        }
+
+        try Expect.equal(
+            await fixture.probe.invocationLog(),
+            "first,second,third",
+            "continuous resume executes untouched suffix without replay"
+        )
+
+        try Expect.equal(
+            completed.attempts.count,
+            3,
+            "two single-step attempts plus one continuation attempt"
+        )
+
+        try Expect.equal(
+            completed.revision,
+            3,
+            "each execution transition advances run revision"
+        )
+
+        guard case .continuation(
+            afterPath: "root.sequence[1]"
+        ) = completed.attempts[2].scope else {
+            throw AgenticExecutionFlowError.unexpectedRunState
+        }
+
+        return [
+            .field(
+                "state",
+                "completed"
+            ),
+            .field(
+                "stepped-after",
+                secondPause.afterCallID
+            ),
+            .field(
+                "executed",
+                await fixture.probe.invocationLog()
+            ),
+            .field(
+                "revision",
+                "\(completed.revision)"
+            ),
+        ]
+    }
+
     static func runToolPlanRetryAndResume() async throws -> [TestFlowDiagnostic] {
         let fixture = try makeFixture()
         let initial = try await fixture.executor.start(

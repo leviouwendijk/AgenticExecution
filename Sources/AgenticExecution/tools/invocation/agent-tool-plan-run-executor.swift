@@ -8,15 +8,20 @@ public enum AgentToolPlanRunError:
     Equatable
 {
     case runNotSuspended
+    case runNotPaused
     case suspensionAlreadyResolved
     case suspensionNotResolved
     case missingSuspendedCall(String)
+    case missingPausedCall(String)
     case unsupportedContinuation(String)
 
     public var errorDescription: String? {
         switch self {
         case .runNotSuspended:
             return "AgentToolPlanRun must be suspended before recovery control can be applied."
+
+        case .runNotPaused:
+            return "AgentToolPlanRun must be paused before execution policy resume can be applied."
 
         case .suspensionAlreadyResolved:
             return "The suspended AgentToolPlan node is already resolved and is awaiting an explicit continuation decision."
@@ -26,6 +31,9 @@ public enum AgentToolPlanRunError:
 
         case .missingSuspendedCall(let callID):
             return "Suspended tool call '\(callID)' is no longer present in the immutable parent AgentToolPlan."
+
+        case .missingPausedCall(let callID):
+            return "Paused tool call '\(callID)' is no longer present at the recorded serial ToolPlan boundary."
 
         case .unsupportedContinuation(let path):
             return "Automatic continuation from '\(path)' is not supported because the interruption is inside batch or outcome-branch ancestry."
@@ -241,12 +249,28 @@ public struct AgentToolPlanRunExecutor:
             throw AgentToolPlanRunError.suspensionNotResolved
         }
 
-        guard let continuation = run.plan.root.sequenceContinuation(
+        return try await resumeContinuation(
+            run,
+            afterPath: suspension.path,
             afterCallID: suspension.callID,
+            context: context,
+            approvalHandler: approvalHandler
+        )
+    }
+
+    func resumeContinuation(
+        _ run: AgentToolPlanRun,
+        afterPath: String,
+        afterCallID: String,
+        context: AgentToolExecutionContext,
+        approvalHandler: (any ToolApprovalHandler)?
+    ) async throws -> AgentToolPlanRun {
+        guard let continuation = run.plan.root.sequenceContinuation(
+            afterCallID: afterCallID,
             path: "root"
         ) else {
             throw AgentToolPlanRunError.unsupportedContinuation(
-                suspension.path
+                afterPath
             )
         }
 
@@ -275,7 +299,7 @@ public struct AgentToolPlanRunExecutor:
         let attempt = AgentToolPlanAttempt(
             number: attemptNumber,
             scope: .continuation(
-                afterPath: suspension.path
+                afterPath: afterPath
             ),
             result: result
         )

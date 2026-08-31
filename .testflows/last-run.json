@@ -1,0 +1,94 @@
+{
+  "failed" : 0,
+  "failed_names" : [
+
+  ],
+  "generated_at" : "2026-08-31T15:42:38Z",
+  "passed" : 6,
+  "results" : [
+    {
+      "display_name" : "tool-plan-run-retry-resume",
+      "duration_seconds" : 0.008005023002624512,
+      "name" : "tool-plan-run-retry-resume",
+      "status" : "passed",
+      "tags" : [
+        "agentic-execution",
+        "resume",
+        "retry",
+        "run",
+        "suspension",
+        "tool-plan"
+      ]
+    },
+    {
+      "display_name" : "tool-plan-run-skip-resume",
+      "duration_seconds" : 0.0002880096435546875,
+      "name" : "tool-plan-run-skip-resume",
+      "status" : "passed",
+      "tags" : [
+        "agentic-execution",
+        "resume",
+        "run",
+        "skip",
+        "suspension",
+        "tool-plan"
+      ]
+    },
+    {
+      "display_name" : "tool-plan-execution-policy-model",
+      "duration_seconds" : 3.0040740966796875e-05,
+      "name" : "tool-plan-execution-policy-model",
+      "status" : "passed",
+      "tags" : [
+        "agentic-execution",
+        "execution-policy",
+        "pause",
+        "tool-plan"
+      ]
+    },
+    {
+      "display_name" : "tool-plan-single-step-start",
+      "duration_seconds" : 0.00011897087097167969,
+      "name" : "tool-plan-single-step-start",
+      "status" : "passed",
+      "tags" : [
+        "agentic-execution",
+        "execution-policy",
+        "pause",
+        "single-step",
+        "tool-plan"
+      ]
+    },
+    {
+      "display_name" : "tool-plan-single-step-resume",
+      "duration_seconds" : 0.00021898746490478516,
+      "name" : "tool-plan-single-step-resume",
+      "status" : "passed",
+      "tags" : [
+        "agentic-execution",
+        "continuous",
+        "execution-policy",
+        "pause",
+        "resume",
+        "single-step",
+        "tool-plan"
+      ]
+    },
+    {
+      "display_name" : "tool-plan-approval-skip-continues",
+      "duration_seconds" : 0.00018203258514404297,
+      "name" : "tool-plan-approval-skip-continues",
+      "status" : "passed",
+      "tags" : [
+        "agentic-execution",
+        "approval",
+        "continuation",
+        "skip",
+        "tool-plan"
+      ]
+    }
+  ],
+  "skipped" : 0,
+  "title" : "AgenticExecution flow tests",
+  "total" : 6
+}
