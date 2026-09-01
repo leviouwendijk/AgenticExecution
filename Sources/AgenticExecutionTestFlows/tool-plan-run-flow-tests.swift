@@ -127,13 +127,35 @@ enum AgenticExecutionFlowTesting {
                 )
             )
         )
+        let fourth = AgentToolCall(
+            id: "fourth",
+            name: "tool_plan_run_probe",
+            input: try JSONToolBridge.encode(
+                RunProbeInput(
+                    marker: "fourth"
+                )
+            )
+        )
         let plan = AgentToolPlan(
             id: "single-step-resume-probe",
             root: .sequence(
                 [
                     .call(first),
-                    .call(second),
-                    .call(third),
+                    .call(
+                        second,
+                        onSuccess: [
+                            .call(
+                                third
+                            ),
+                        ]
+                    ),
+                    .batch(
+                        [
+                            .call(
+                                fourth
+                            ),
+                        ]
+                    ),
                 ]
             )
         )
@@ -202,27 +224,32 @@ enum AgenticExecutionFlowTesting {
 
         try Expect.equal(
             await fixture.probe.invocationLog(),
-            "first,second,third",
-            "continuous resume executes untouched suffix without replay"
+            "first,second,third,fourth",
+            "continuous resume traverses success branch and batch without replay"
         )
 
         try Expect.equal(
             completed.attempts.count,
-            3,
-            "two single-step attempts plus one continuation attempt"
+            4,
+            "single-step traversal records one attempt per authored call"
         )
+
+        guard case .node(
+            path: "root.sequence[1].onSuccess.sequence[0]",
+            callID: "third"
+        ) = completed.attempts[2].scope,
+              case .node(
+                path: "root.sequence[2].batch[0]",
+                callID: "fourth"
+              ) = completed.attempts[3].scope else {
+            throw AgenticExecutionFlowError.unexpectedRunState
+        }
 
         try Expect.equal(
             completed.revision,
-            3,
-            "each execution transition advances run revision"
+            4,
+            "each authored execution boundary advances run revision"
         )
-
-        guard case .continuation(
-            afterPath: "root.sequence[1]"
-        ) = completed.attempts[2].scope else {
-            throw AgenticExecutionFlowError.unexpectedRunState
-        }
 
         return [
             .field(

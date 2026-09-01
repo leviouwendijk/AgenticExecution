@@ -3,12 +3,12 @@
   "failed_names" : [
 
   ],
-  "generated_at" : "2026-08-31T15:42:38Z",
+  "generated_at" : "2026-09-01T10:21:45Z",
   "passed" : 6,
   "results" : [
     {
       "display_name" : "tool-plan-run-retry-resume",
-      "duration_seconds" : 0.008005023002624512,
+      "duration_seconds" : 0.010679006576538086,
       "name" : "tool-plan-run-retry-resume",
       "status" : "passed",
       "tags" : [
@@ -22,7 +22,7 @@
     },
     {
       "display_name" : "tool-plan-run-skip-resume",
-      "duration_seconds" : 0.0002880096435546875,
+      "duration_seconds" : 0.00012493133544921875,
       "name" : "tool-plan-run-skip-resume",
       "status" : "passed",
       "tags" : [
@@ -36,7 +36,7 @@
     },
     {
       "display_name" : "tool-plan-execution-policy-model",
-      "duration_seconds" : 3.0040740966796875e-05,
+      "duration_seconds" : 1.2993812561035156e-05,
       "name" : "tool-plan-execution-policy-model",
       "status" : "passed",
       "tags" : [
@@ -48,7 +48,7 @@
     },
     {
       "display_name" : "tool-plan-single-step-start",
-      "duration_seconds" : 0.00011897087097167969,
+      "duration_seconds" : 6.103515625e-05,
       "name" : "tool-plan-single-step-start",
       "status" : "passed",
       "tags" : [
@@ -61,7 +61,7 @@
     },
     {
       "display_name" : "tool-plan-single-step-resume",
-      "duration_seconds" : 0.00021898746490478516,
+      "duration_seconds" : 0.00018107891082763672,
       "name" : "tool-plan-single-step-resume",
       "status" : "passed",
       "tags" : [
@@ -76,7 +76,7 @@
     },
     {
       "display_name" : "tool-plan-approval-skip-continues",
-      "duration_seconds" : 0.00018203258514404297,
+      "duration_seconds" : 8.594989776611328e-05,
       "name" : "tool-plan-approval-skip-continues",
       "status" : "passed",
       "tags" : [

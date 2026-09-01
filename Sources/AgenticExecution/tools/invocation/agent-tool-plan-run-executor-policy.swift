@@ -43,12 +43,18 @@ public extension AgentToolPlanRunExecutor {
 
         switch executionPolicy {
         case .continuous:
-            return try await resumePausedContinuously(
-                run,
-                pause: pause,
-                context: context,
-                approvalHandler: approvalHandler
-            )
+            var current = run
+
+            while case .paused = current.state {
+                current = try await resume(
+                    current,
+                    executionPolicy: .single_step,
+                    context: context,
+                    approvalHandler: approvalHandler
+                )
+            }
+
+            return current
 
         case .single_step:
             return try await resumePausedSingleStep(
@@ -71,11 +77,12 @@ private extension AgentToolPlanRunExecutor {
     ) async throws -> AgentToolPlanRun {
         try plan.validate()
 
-        let steps = try plan.root.serialSingleSteps(
-            path: "root"
+        let initialTraversal = plan.root.singleStepTraversal(
+            path: "root",
+            outcomesByPath: [:]
         )
 
-        guard let step = steps.first else {
+        guard case .next(let step) = initialTraversal else {
             return try await start(
                 plan,
                 runID: runID,
@@ -117,20 +124,28 @@ private extension AgentToolPlanRunExecutor {
             ),
             result: result
         )
+        let attempts = [
+            attempt,
+        ]
+        let traversal = plan.root.singleStepTraversal(
+            path: "root",
+            outcomesByPath: AgentToolPlanSingleStepHistory
+                .outcomesByPath(
+                    attempts: attempts
+                )
+        )
         let state = singleStepState(
             from: isolatedRun.state,
             step: step,
             attemptNumber: attemptNumber,
-            hasContinuation: steps.count > 1
+            traversal: traversal
         )
 
         return AgentToolPlanRun(
             id: runID,
             plan: plan,
             relationship: relationship,
-            attempts: [
-                attempt,
-            ],
+            attempts: attempts,
             resolutions: [],
             revision: 1,
             state: state
@@ -141,21 +156,14 @@ private extension AgentToolPlanRunExecutor {
         from state: AgentToolPlanRunState,
         step: AgentToolPlanSingleStep,
         attemptNumber: Int,
-        hasContinuation: Bool
+        traversal: AgentToolPlanSingleStepTraversal
     ) -> AgentToolPlanRunState {
         switch state {
         case .completed:
-            guard hasContinuation else {
-                return .completed
-            }
-
-            return .paused(
-                AgentToolPlanPause(
-                    afterPath: step.path,
-                    afterCallID: step.call.id,
-                    attemptNumber: attemptNumber,
-                    reason: .single_step
-                )
+            return agentToolPlanSingleStepParentState(
+                traversal: traversal,
+                after: step,
+                attemptNumber: attemptNumber
             )
 
         case .paused(let pause):
@@ -180,9 +188,11 @@ private extension AgentToolPlanRunExecutor {
                 )
             )
 
-        case .stopped(let outcome):
-            return .stopped(
-                outcome
+        case .stopped:
+            return agentToolPlanSingleStepParentState(
+                traversal: traversal,
+                after: step,
+                attemptNumber: attemptNumber
             )
         }
     }
@@ -195,25 +205,47 @@ private extension AgentToolPlanRunExecutor {
         context: AgentToolExecutionContext,
         approvalHandler: (any ToolApprovalHandler)?
     ) async throws -> AgentToolPlanRun {
-        let steps = try run.plan.root.serialSingleSteps(
-            path: "root"
-        )
+        let outcomesByPath =
+            AgentToolPlanSingleStepHistory.outcomesByPath(
+                attempts: run.attempts,
+                resolutions: run.resolutions
+            )
 
-        guard let currentIndex = steps.firstIndex(
-            where: { step in
-                step.path == pause.afterPath
-                    && step.call.id == pause.afterCallID
-            }
+        guard AgentToolPlanSingleStepHistory.containsRecordedCall(
+            path: pause.afterPath,
+            callID: pause.afterCallID,
+            attempts: run.attempts,
+            resolutions: run.resolutions
         ) else {
             throw AgentToolPlanRunError.missingPausedCall(
                 pause.afterCallID
             )
         }
 
-        let nextIndex = currentIndex + 1
+        let traversal = run.plan.root.singleStepTraversal(
+            path: "root",
+            outcomesByPath: outcomesByPath
+        )
         let revision = run.revision + 1
 
-        guard steps.indices.contains(nextIndex) else {
+        guard case .next(let step) = traversal else {
+            let state: AgentToolPlanRunState
+
+            switch traversal {
+            case .complete(.succeeded):
+                state = .completed
+
+            case .complete(let outcome):
+                state = .stopped(
+                    outcome
+                )
+
+            case .next:
+                preconditionFailure(
+                    "Traversal changed after matching .next."
+                )
+            }
+
             return AgentToolPlanRun(
                 id: run.id,
                 plan: run.plan,
@@ -221,11 +253,9 @@ private extension AgentToolPlanRunExecutor {
                 attempts: run.attempts,
                 resolutions: run.resolutions,
                 revision: revision,
-                state: .completed
+                state: state
             )
         }
-
-        let step = steps[nextIndex]
         let attemptNumber = run.attempts.count + 1
         let isolatedPlan = AgentToolPlan(
             id: "\(run.plan.id).single-step.\(attemptNumber)",
@@ -258,18 +288,29 @@ private extension AgentToolPlanRunExecutor {
             ),
             result: result
         )
+        let attempts = run.attempts + [
+            attempt,
+        ]
+        let nextTraversal = run.plan.root.singleStepTraversal(
+            path: "root",
+            outcomesByPath: AgentToolPlanSingleStepHistory
+                .outcomesByPath(
+                    attempts: attempts,
+                    resolutions: run.resolutions
+                )
+        )
         let state = singleStepState(
             from: isolatedRun.state,
             step: step,
             attemptNumber: attemptNumber,
-            hasContinuation: nextIndex < steps.count - 1
+            traversal: nextTraversal
         )
 
         return AgentToolPlanRun(
             id: run.id,
             plan: run.plan,
             relationship: run.relationship,
-            attempts: run.attempts + [attempt],
+            attempts: attempts,
             resolutions: run.resolutions,
             revision: revision,
             state: state
@@ -292,7 +333,7 @@ private extension AgentToolPlanRunExecutor {
     }
 }
 
-private struct AgentToolPlanSingleStep:
+struct AgentToolPlanSingleStep:
     Sendable
 {
     let path: String
