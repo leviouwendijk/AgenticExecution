@@ -94,5 +94,18 @@ enum AgenticExecutionFlowSuite: TestFlowRegistry {
             try await AgenticExecutionFlowTesting
                 .runToolPlanApprovalSkip()
         },
+        TestFlow(
+            "tool-policy-directives",
+            tags: [
+                "agentic-execution",
+                "policy",
+                "preflight",
+                "approval",
+                "escalation",
+            ]
+        ) {
+            try AgenticExecutionFlowTesting
+                .runToolPolicyDirectives()
+        },
     ]
 }

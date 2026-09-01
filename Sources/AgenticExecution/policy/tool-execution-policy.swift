@@ -15,7 +15,11 @@ public struct ToolExecutionPolicy: Sendable, Codable, Hashable {
     public func evaluate(
         _ preflight: ToolPreflight
     ) -> ApprovalRequirement {
-        if preflight.risk == .forbidden {
+        if preflight.risk == .forbidden
+            || preflight.policyDirectives?.contains(
+                .require_deny
+            ) == true
+        {
             return .denied_forbidden
         }
 
@@ -29,12 +33,39 @@ public struct ToolExecutionPolicy: Sendable, Codable, Hashable {
             return .needs_human_review
         }
 
+        let requirement = autonomyRequirement(
+            for: preflight.risk
+        )
+
+        guard
+            requirement == .no_approval_needed,
+            preflight.policyDirectives?.contains(
+                .require_human_review
+            ) == true
+        else {
+            return requirement
+        }
+
+        return .needs_human_review
+    }
+
+    public func decision(
+        for preflight: ToolPreflight
+    ) -> ApprovalDecision {
+        evaluate(preflight).decision
+    }
+}
+
+private extension ToolExecutionPolicy {
+    func autonomyRequirement(
+        for risk: ActionRisk
+    ) -> ApprovalRequirement {
         switch autonomyMode {
         case .suggest_only:
             return .needs_human_review
 
         case .auto_observe:
-            switch preflight.risk {
+            switch risk {
             case .observe:
                 return .no_approval_needed
 
@@ -46,7 +77,7 @@ public struct ToolExecutionPolicy: Sendable, Codable, Hashable {
             }
 
         case .auto_bounded_mutate:
-            switch preflight.risk {
+            switch risk {
             case .observe, .boundedmutate:
                 return .no_approval_needed
 
@@ -55,7 +86,7 @@ public struct ToolExecutionPolicy: Sendable, Codable, Hashable {
             }
 
         case .review_privileged:
-            switch preflight.risk {
+            switch risk {
             case .observe, .boundedmutate:
                 return .no_approval_needed
 
@@ -66,11 +97,5 @@ public struct ToolExecutionPolicy: Sendable, Codable, Hashable {
                 return .denied_forbidden
             }
         }
-    }
-
-    public func decision(
-        for preflight: ToolPreflight
-    ) -> ApprovalDecision {
-        evaluate(preflight).decision
     }
 }

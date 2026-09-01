@@ -38,6 +38,8 @@ public struct ToolPreflight: Sendable, Codable, Hashable, CustomStringConvertibl
     public let limitProfile: String?
     public let diffPreview: ToolPreflightDiffPreview?
 
+    public let policyDirectives: [ToolPolicyDirective]?
+
     public init(
         toolName: String,
         risk: ActionRisk,
@@ -71,7 +73,8 @@ public struct ToolPreflight: Sendable, Codable, Hashable, CustomStringConvertibl
         policyChecks: [String] = [],
         warnings: [String] = [],
         limitProfile: String? = nil,
-        diffPreview: ToolPreflightDiffPreview? = nil
+        diffPreview: ToolPreflightDiffPreview? = nil,
+        policyDirectives: [ToolPolicyDirective]? = nil
     ) {
         self.toolName = toolName
         self.risk = risk
@@ -174,6 +177,7 @@ public struct ToolPreflight: Sendable, Codable, Hashable, CustomStringConvertibl
         self.warnings = warnings
         self.limitProfile = limitProfile
         self.diffPreview = diffPreview
+        self.policyDirectives = policyDirectives
     }
 
     public var description: String {
@@ -266,6 +270,13 @@ public struct ToolPreflight: Sendable, Codable, Hashable, CustomStringConvertibl
         if let diffPreview {
             lines.append(
                 "diff preview: \(diffPreview.insertedLineCount) insertions, \(diffPreview.deletedLineCount) deletions"
+            )
+        }
+
+        if let policyDirectives,
+           !policyDirectives.isEmpty {
+            lines.append(
+                "policy directives: \(policyDirectives.map(\.rawValue).joined(separator: ", "))"
             )
         }
 
