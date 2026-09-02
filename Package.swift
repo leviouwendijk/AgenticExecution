@@ -82,8 +82,16 @@ let package = Package(
                     package: "Agentic"
                 ),
                 .product(
+                    name: "AgenticWorkspace",
+                    package: "AgenticWorkspace"
+                ),
+                .product(
                     name: "Primitives",
                     package: "Primitives"
+                ),
+                .product(
+                    name: "Schema",
+                    package: "Schema"
                 ),
                 .product(
                     name: "TestFlows",

@@ -35,6 +35,67 @@ public struct ToolRegistry: Sendable {
             }
     }
 
+    public var modelFacingDefinitions: [AgentToolDefinition] {
+        capabilities.compactMap { capability in
+            guard capability.isModelFacing else {
+                return nil
+            }
+
+            return capability.definition
+        }
+    }
+
+    public func modelFacingDefinition(
+        identifiedBy identifier: AgentToolIdentifier
+    ) -> AgentToolDefinition? {
+        guard let registered =
+            registeredTool(
+                identifiedBy: identifier
+            ),
+            registered.capability.isModelFacing
+        else {
+            return nil
+        }
+
+        return registered.capability.definition
+    }
+
+    public func modelFacingDefinitions(
+        for identifiers: [AgentToolIdentifier]
+    ) throws -> [AgentToolDefinition] {
+        var seen:
+            Set<AgentToolIdentifier> = []
+        var definitions:
+            [AgentToolDefinition] = []
+
+        for identifier in identifiers {
+            guard seen.insert(
+                identifier
+            ).inserted else {
+                continue
+            }
+
+            guard let definition =
+                modelFacingDefinition(
+                    identifiedBy: identifier
+                )
+            else {
+                throw ToolRegistryError
+                    .missingModelFacingTool(
+                        identifier.rawValue
+                    )
+            }
+
+            definitions.append(
+                definition
+            )
+        }
+
+        return definitions.sorted { lhs, rhs in
+            lhs.name < rhs.name
+        }
+    }
+
     public var capabilities: [AgentToolCapability] {
         tools.values
             .map(

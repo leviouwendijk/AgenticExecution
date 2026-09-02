@@ -110,6 +110,57 @@ enum AgenticExecutionFlowSuite: TestFlowRegistry {
                 .runToolPlanApprovalSkip()
         },
         TestFlow(
+            "tool-exposure-all",
+            tags: [
+                "agentic-execution",
+                "tools",
+                "exposure",
+                "all",
+            ]
+        ) {
+            try await AgenticExecutionFlowTesting
+                .runToolExposureAll()
+        },
+        TestFlow(
+            "tool-exposure-explicit",
+            tags: [
+                "agentic-execution",
+                "tools",
+                "exposure",
+                "explicit",
+                "enforcement",
+            ]
+        ) {
+            try await AgenticExecutionFlowTesting
+                .runToolExposureExplicit()
+        },
+        TestFlow(
+            "tool-exposure-discoverable",
+            tags: [
+                "agentic-execution",
+                "tools",
+                "exposure",
+                "discovery",
+                "activation",
+            ]
+        ) {
+            try await AgenticExecutionFlowTesting
+                .runToolExposureDiscoverable()
+        },
+        TestFlow(
+            "tool-exposure-registry-preservation",
+            tags: [
+                "agentic-execution",
+                "tools",
+                "exposure",
+                "registry",
+                "host-only",
+            ]
+        ) {
+            try await AgenticExecutionFlowTesting
+                .runToolExposureRegistryPreservation()
+        },
+        TestFlow(
             "tool-policy-directives",
             tags: [
                 "agentic-execution",
