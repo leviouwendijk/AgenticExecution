@@ -28,6 +28,21 @@ enum AgenticExecutionFlowSuite: TestFlowRegistry {
                 .runToolPlanRetryAndResume()
         },
         TestFlow(
+            "tool-plan-failure-branch-retry-resume",
+            tags: [
+                "agentic-execution",
+                "tool-plan",
+                "on-failure",
+                "path",
+                "resolution",
+                "retry",
+                "resume",
+            ]
+        ) {
+            try await AgenticExecutionFlowTesting
+                .runToolPlanFailureBranchRetryResume()
+        },
+        TestFlow(
             "tool-plan-run-skip-resume",
             tags: [
                 "agentic-execution",

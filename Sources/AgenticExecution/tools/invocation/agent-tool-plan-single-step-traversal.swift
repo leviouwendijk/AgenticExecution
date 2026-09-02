@@ -122,10 +122,10 @@ extension AgentToolPlanNode {
             let selectedOutcome: AgentToolPlanOutcome
 
             if let selectedLabel {
-                let branch = AgentToolPlanNode.sequence(
-                    selectedNodes
-                ).singleStepTraversal(
+                let branch = singleStepSequenceTraversal(
+                    selectedNodes,
                     path: "\(path).\(selectedLabel)",
+                    pathComponent: nil,
                     outcomesByPath: outcomesByPath
                 )
 
@@ -148,30 +148,11 @@ extension AgentToolPlanNode {
             )
 
         case .sequence(let children):
-            for (
-                index,
-                child
-            ) in children.enumerated() {
-                let childTraversal = child.singleStepTraversal(
-                    path: "\(path).sequence[\(index)]",
-                    outcomesByPath: outcomesByPath
-                )
-
-                switch childTraversal {
-                case .next:
-                    return childTraversal
-
-                case .complete(let outcome):
-                    guard outcome == .succeeded else {
-                        return .complete(
-                            outcome
-                        )
-                    }
-                }
-            }
-
-            return .complete(
-                .succeeded
+            return singleStepSequenceTraversal(
+                children,
+                path: path,
+                pathComponent: "sequence",
+                outcomesByPath: outcomesByPath
             )
 
         case .batch(let children):
@@ -209,6 +190,49 @@ extension AgentToolPlanNode {
                 )
             )
         }
+    }
+
+    private func singleStepSequenceTraversal(
+        _ children: [AgentToolPlanNode],
+        path: String,
+        pathComponent: String?,
+        outcomesByPath: [String: AgentToolPlanOutcome]
+    ) -> AgentToolPlanSingleStepTraversal {
+        for (
+            index,
+            child
+        ) in children.enumerated() {
+            let childPath: String
+
+            if let pathComponent {
+                childPath =
+                    "\(path).\(pathComponent)[\(index)]"
+            } else {
+                childPath =
+                    "\(path)[\(index)]"
+            }
+
+            let childTraversal = child.singleStepTraversal(
+                path: childPath,
+                outcomesByPath: outcomesByPath
+            )
+
+            switch childTraversal {
+            case .next:
+                return childTraversal
+
+            case .complete(let outcome):
+                guard outcome == .succeeded else {
+                    return .complete(
+                        outcome
+                    )
+                }
+            }
+        }
+
+        return .complete(
+            .succeeded
+        )
     }
 
     private func singleStepFinalOutcome(

@@ -235,7 +235,7 @@ enum AgenticExecutionFlowTesting {
         )
 
         guard case .node(
-            path: "root.sequence[1].onSuccess.sequence[0]",
+            path: "root.sequence[1].onSuccess[0]",
             callID: "third"
         ) = completed.attempts[2].scope,
               case .node(
@@ -414,6 +414,162 @@ enum AgenticExecutionFlowTesting {
             .field(
                 "revision",
                 "\(resumed.revision)"
+            ),
+        ]
+    }
+
+    static func runToolPlanFailureBranchRetryResume() async throws -> [TestFlowDiagnostic] {
+        let fixture = try makeFixture()
+        let prefix = AgentToolCall(
+            id: "failure-branch-prefix",
+            name: "tool_plan_run_probe",
+            input: try JSONToolBridge.encode(
+                RunProbeInput(
+                    marker: "prefix"
+                )
+            )
+        )
+        let repair = AgentToolCall(
+            id: "failure-branch-repair",
+            name: "tool_plan_run_probe",
+            input: try JSONToolBridge.encode(
+                RunProbeInput(
+                    marker: "repair"
+                )
+            )
+        )
+        let branchFix = AgentToolCall(
+            id: "failure-branch-fix",
+            name: "tool_plan_run_probe",
+            input: try JSONToolBridge.encode(
+                RunProbeInput(
+                    marker: "branch-fix"
+                )
+            )
+        )
+        let suffix = AgentToolCall(
+            id: "failure-branch-suffix",
+            name: "tool_plan_run_probe",
+            input: try JSONToolBridge.encode(
+                RunProbeInput(
+                    marker: "suffix"
+                )
+            )
+        )
+        let plan = AgentToolPlan(
+            id: "failure-branch-retry-resume-probe",
+            root: .sequence(
+                [
+                    .call(prefix),
+                    .call(
+                        repair,
+                        onFailure: [
+                            .call(
+                                branchFix
+                            ),
+                        ]
+                    ),
+                    .call(suffix),
+                ]
+            )
+        )
+
+        let initial = try await fixture.executor.start(
+            plan,
+            runID: "failure-branch-retry-resume"
+        )
+
+        guard case .suspended(let initialSuspension) = initial.state,
+              initialSuspension.path == "root.sequence[1]",
+              initialSuspension.callID == "failure-branch-repair",
+              let initialAttempt = initial.attempts.first else {
+            throw AgenticExecutionFlowError.unexpectedRunState
+        }
+
+        guard initialAttempt.result.records.contains(
+            where: {
+                $0.path == "root.sequence[1].onFailure[0]"
+                    && $0.call.id == "failure-branch-fix"
+                    && $0.outcome == .succeeded
+            }
+        ),
+        !initialAttempt.result.records.contains(
+            where: {
+                $0.path.contains(
+                    ".onFailure.sequence["
+                )
+            }
+        ) else {
+            throw AgenticExecutionFlowError.unexpectedRunState
+        }
+
+        try Expect.equal(
+            await fixture.probe.invocationLog(),
+            "prefix,repair,branch-fix",
+            "selected failure branch executes before parent suspension"
+        )
+
+        let retried = try await fixture.executor.retry(
+            initial
+        )
+
+        guard case .suspended(let retrySuspension) = retried.state,
+              case .continuation_required(let resolution) = retrySuspension.reason else {
+            throw AgenticExecutionFlowError.unexpectedRunState
+        }
+
+        try Expect.equal(
+            resolution.path,
+            "root.sequence[1]",
+            "retry resolves only the failed parent call"
+        )
+        try Expect.equal(
+            await fixture.probe.invocationLog(),
+            "prefix,repair,branch-fix,repair",
+            "retry does not replay the authored failure branch"
+        )
+
+        let resumed = try await fixture.executor.resume(
+            retried
+        )
+
+        guard case .completed = resumed.state else {
+            throw AgenticExecutionFlowError.unexpectedRunState
+        }
+
+        try Expect.equal(
+            await fixture.probe.invocationLog(),
+            "prefix,repair,branch-fix,repair,suffix",
+            "resume executes the untouched suffix exactly once"
+        )
+        try Expect.equal(
+            resumed.resolutions.map(\.path),
+            [
+                "root.sequence[1]",
+            ],
+            "failure-branch recovery records no resolution for the untouched suffix"
+        )
+
+        guard !resumed.resolutions.contains(
+            where: {
+                $0.path == "root.sequence[2]"
+            }
+        ) else {
+            throw AgenticExecutionFlowError.unexpectedResolution
+        }
+
+        return [
+            .field(
+                "branch-path",
+                "root.sequence[1].onFailure[0]"
+            ),
+            .field(
+                "resolution-path",
+                resolution.path
+            ),
+            .field(
+                "executed",
+                await fixture.probe.invocationLog()
             ),
         ]
     }

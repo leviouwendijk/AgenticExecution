@@ -190,6 +190,7 @@ private extension AgentToolPlanExecutor {
     func executeSequence(
         _ nodes: [AgentToolPlanNode],
         path: String,
+        pathComponent: String? = "sequence",
         context: AgentToolExecutionContext,
         approvalHandler: (any ToolApprovalHandler)?
     ) async -> NodeExecution {
@@ -199,8 +200,15 @@ private extension AgentToolPlanExecutor {
             index,
             node
         ) in nodes.enumerated() {
-            let childPath =
-                "\(path).sequence[\(index)]"
+            let childPath: String
+
+            if let pathComponent {
+                childPath =
+                    "\(path).\(pathComponent)[\(index)]"
+            } else {
+                childPath =
+                    "\(path)[\(index)]"
+            }
 
             let child = await execute(
                 node,
@@ -215,10 +223,20 @@ private extension AgentToolPlanExecutor {
 
             guard child.outcome == .succeeded else {
                 for remainingIndex in nodes.indices where remainingIndex > index {
+                    let remainingPath: String
+
+                    if let pathComponent {
+                        remainingPath =
+                            "\(path).\(pathComponent)[\(remainingIndex)]"
+                    } else {
+                        remainingPath =
+                            "\(path)[\(remainingIndex)]"
+                    }
+
                     records.append(
                         contentsOf: skippedRecords(
                             for: nodes[remainingIndex],
-                            path: "\(path).sequence[\(remainingIndex)]",
+                            path: remainingPath,
                             reason: "sequence_stopped_after_\(child.outcome.rawValue)"
                         )
                     )
@@ -334,6 +352,7 @@ private extension AgentToolPlanExecutor {
             let selected = await executeSequence(
                 selectedNodes,
                 path: "\(path).\(selectedLabel)",
+                pathComponent: nil,
                 context: context,
                 approvalHandler: approvalHandler
             )
