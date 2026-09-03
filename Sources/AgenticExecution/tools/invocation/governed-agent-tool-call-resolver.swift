@@ -21,13 +21,17 @@ public struct GovernedAgentToolCallResolver:
     public let invoker: ToolInvoker
     public let context: AgentToolExecutionContext
     public let approvalHandler: (any ToolApprovalHandler)?
+    public let resolutionObserver:
+        (@Sendable (ToolInvocation.Result) async -> Void)?
 
     public init(
         registry: ToolRegistry,
         exposure: AgentToolExposure,
         policy: ToolExecutionPolicy,
         context: AgentToolExecutionContext = .init(),
-        approvalHandler: (any ToolApprovalHandler)? = nil
+        approvalHandler: (any ToolApprovalHandler)? = nil,
+        resolutionObserver:
+            (@Sendable (ToolInvocation.Result) async -> Void)? = nil
     ) {
         self.registry = registry
         self.exposure = exposure
@@ -37,6 +41,7 @@ public struct GovernedAgentToolCallResolver:
         )
         self.context = context
         self.approvalHandler = approvalHandler
+        self.resolutionObserver = resolutionObserver
     }
 
     public func resolve(
@@ -53,6 +58,10 @@ public struct GovernedAgentToolCallResolver:
                 .model_tool_call
             ),
             approvalHandler: approvalHandler
+        )
+
+        await resolutionObserver?(
+            invocation
         )
 
         if let result = invocation.toolResult {
