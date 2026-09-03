@@ -1,22 +1,22 @@
 import Agentic
 import Schema
 
-/// Host-facing execution capability captured from one RegisteredAgentTool.
+/// Host-facing capability captured from one RegisteredAgentTool.
 public struct AgentToolCapability:
     Sendable
 {
     public let definition: AgentToolDefinition
     public let modelContract: AgentToolModelContract
-    public let supportsWorkspaceTargeting: Bool
+    public let execution: AgentToolExecutionContract
 
     public init(
         definition: AgentToolDefinition,
         modelContract: AgentToolModelContract,
-        supportsWorkspaceTargeting: Bool
+        execution: AgentToolExecutionContract
     ) {
         self.definition = definition
         self.modelContract = modelContract
-        self.supportsWorkspaceTargeting = supportsWorkspaceTargeting
+        self.execution = execution
     }
 
     public var semanticInputSchema: JSONSchema? {

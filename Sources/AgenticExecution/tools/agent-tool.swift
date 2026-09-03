@@ -22,6 +22,7 @@ public protocol AgentTool<Input, Output>: Sendable {
     var description: String { get }
     var risk: ActionRisk { get }
     var modelContract: AgentToolModelContract { get }
+    var execution: AgentToolExecutionContract { get }
 
     func preflight(
         _ input: Input,
@@ -57,6 +58,10 @@ public extension AgentTool {
         .modelFacing(
             inputSchema: semanticInputSchema
         )
+    }
+
+    var execution: AgentToolExecutionContract {
+        .fixed
     }
 
     var definition: AgentToolDefinition {

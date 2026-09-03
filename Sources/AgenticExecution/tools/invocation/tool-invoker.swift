@@ -137,7 +137,10 @@ private extension ToolInvoker {
             )
         }
 
-        guard tool.capability.supportsWorkspaceTargeting else {
+        guard
+            tool.capability.execution.workingLocation
+                == .targetable
+        else {
             throw WorkspaceToolTargetingError.unsupportedTool(
                 call.name
             )

@@ -33,8 +33,7 @@ public struct RegisteredAgentTool: Sendable {
         let capability = AgentToolCapability(
             definition: tool.definition,
             modelContract: tool.modelContract,
-            supportsWorkspaceTargeting:
-                tool is any WorkspaceTargetableTool
+            execution: tool.execution
         )
 
         self.capability = capability

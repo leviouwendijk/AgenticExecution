@@ -1,7 +1,4 @@
 import Foundation
-import AgenticWorkspace
-
-public protocol WorkspaceTargetableTool: AgentTool {}
 
 public enum WorkspaceToolTargetingError:
     Error,

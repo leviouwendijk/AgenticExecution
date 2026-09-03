@@ -1,6 +1,7 @@
 import Agentic
 import AgenticExecution
 import AgenticWorkspace
+import Foundation
 import Primitives
 import Schema
 import TestFlows
@@ -38,9 +39,9 @@ extension AgenticExecutionFlowTesting {
             "registration preserves the concrete tool definition"
         )
         try Expect.equal(
-            parsed.capability.supportsWorkspaceTargeting,
-            true,
-            "registration captures workspace targeting before type erasure"
+            parsed.capability.execution.workingLocation,
+            .targetable,
+            "registration captures working-location capability before type erasure"
         )
 
         let preflight = try await registry.preflight(
@@ -118,6 +119,8 @@ extension AgenticExecutionFlowTesting {
             "stateful tool dependencies survive registration erasure"
         )
 
+        try proveWorkspaceSelectionAuthority()
+
         return [
             .field(
                 "output",
@@ -133,6 +136,117 @@ extension AgenticExecutionFlowTesting {
             ),
         ]
     }
+}
+
+private func proveWorkspaceSelectionAuthority() throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent(
+            "agentic-workspace-selection-\(UUID().uuidString)",
+            isDirectory: true
+        )
+
+    defer {
+        try? FileManager.default.removeItem(
+            at: root
+        )
+    }
+
+    try FileManager.default.createDirectory(
+        at: root.appendingPathComponent(
+            "Allowed/Private",
+            isDirectory: true
+        ),
+        withIntermediateDirectories: true
+    )
+    try FileManager.default.createDirectory(
+        at: root.appendingPathComponent(
+            "Denied",
+            isDirectory: true
+        ),
+        withIntermediateDirectories: true
+    )
+
+    let workspace = try AgentWorkspace(
+        root: root,
+        selection: try WorkspaceSelection(
+            exactPaths: [
+                "Allowed",
+            ],
+            includeExpressions: [
+                "Allowed/**",
+            ],
+            excludeExpressions: [
+                "Allowed/Private",
+                "Allowed/Private/**",
+            ]
+        )
+    )
+
+    _ = try workspace.location(
+        for: .init(
+            subpath: "Allowed"
+        )
+    )
+
+    var outsideIncludesDenied = false
+    do {
+        _ = try workspace.location(
+            for: .init(
+                subpath: "Denied"
+            )
+        )
+    } catch let error as WorkspaceAccessError {
+        if case .selectionDenied = error {
+            outsideIncludesDenied = true
+        } else {
+            throw error
+        }
+    }
+
+    try Expect.true(
+        outsideIncludesDenied,
+        "workspace selection denies paths outside includes"
+    )
+
+    var exclusionDenied = false
+    do {
+        _ = try workspace.location(
+            for: .init(
+                subpath: "Allowed/Private"
+            )
+        )
+    } catch let error as WorkspaceAccessError {
+        if case .selectionDenied = error {
+            exclusionDenied = true
+        } else {
+            throw error
+        }
+    }
+
+    try Expect.true(
+        exclusionDenied,
+        "workspace selection exclusions override includes"
+    )
+
+    var absoluteRejected = false
+    do {
+        _ = try WorkspaceSelection(
+            includeExpressions: [
+                "/tmp/**",
+            ]
+        )
+    } catch let error as WorkspaceSelectionError {
+        if case .nonRelativeExpression = error {
+            absoluteRejected = true
+        } else {
+            throw error
+        }
+    }
+
+    try Expect.true(
+        absoluteRejected,
+        "workspace selection accepts only root-relative expressions"
+    )
 }
 
 private struct TypedAgentToolContractInput:
@@ -208,8 +322,7 @@ private actor TypedAgentToolObservationStore {
 }
 
 private struct TypedAgentToolContractTool:
-    AgentTool,
-    WorkspaceTargetableTool
+    AgentTool
 {
     typealias Input = TypedAgentToolContractInput
     typealias Output = TypedAgentToolContractOutput
@@ -219,6 +332,7 @@ private struct TypedAgentToolContractTool:
     let description =
         "Exercise typed AgentTool registration and execution."
     let risk: ActionRisk = .observe
+    let execution: AgentToolExecutionContract = .targetable
     let probe: TypedAgentToolContractProbe
 
     func preflight(
