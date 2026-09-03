@@ -21,22 +21,12 @@ public struct AgentToolRegistration: Sendable {
 }
 
 public extension AgentToolRegistration {
-    static func tool(
-        _ tool: any AgentTool
-    ) -> Self {
+    static func tool<T>(
+        _ tool: T
+    ) -> Self where T: AgentTool {
         .init { registry in
             try registry.register(
                 tool
-            )
-        }
-    }
-
-    static func declaration(
-        _ declaration: AgentToolDeclaration
-    ) -> Self {
-        .init { registry in
-            try registry.register(
-                declaration.makeTool()
             )
         }
     }
@@ -78,30 +68,6 @@ public enum AgentToolBuilder {
         [
             .tool(expression)
         ]
-    }
-
-    public static func buildExpression(
-        _ expression: any AgentTool
-    ) -> [AgentToolRegistration] {
-        [
-            .tool(expression)
-        ]
-    }
-
-    public static func buildExpression(
-        _ expression: AgentToolDeclaration
-    ) -> [AgentToolRegistration] {
-        [
-            .declaration(expression)
-        ]
-    }
-
-    public static func buildExpression(
-        _ expression: [AgentToolDeclaration]
-    ) -> [AgentToolRegistration] {
-        expression.map {
-            .declaration($0)
-        }
     }
 
     public static func buildExpression(

@@ -174,9 +174,10 @@ private struct ToolCallResolverObserverInput:
 }
 
 private struct ToolCallResolverObserverTool:
-    TypedInstanceAgentTool
+    AgentTool
 {
     typealias Input = ToolCallResolverObserverInput
+    typealias Output = ToolCallResolverObserverInput
 
     let identifier: AgentToolIdentifier
     let description: String
@@ -184,9 +185,9 @@ private struct ToolCallResolverObserverTool:
     let probe: ToolCallResolverObserverProbe
 
     func call(
-        input: JSONValue,
-        workspace _: AgentWorkspace?
-    ) async throws -> JSONValue {
+        _ input: Input,
+        context _: AgentToolExecutionContext
+    ) async throws -> Output {
         await probe.recordInvocation()
         return input
     }
@@ -204,20 +205,20 @@ private func toolCallResolverObserverRegistry(
     var registry = ToolRegistry()
 
     try registry.register(
-        [
-            ToolCallResolverObserverTool(
-                identifier: "resolver_observer_observe",
-                description: "Observe resolver observer fixture.",
-                risk: .observe,
-                probe: probe
-            ),
-            ToolCallResolverObserverTool(
-                identifier: "resolver_observer_mutate",
-                description: "Mutate resolver observer fixture.",
-                risk: .boundedmutate,
-                probe: probe
-            ),
-        ] as [any AgentTool]
+        ToolCallResolverObserverTool(
+            identifier: "resolver_observer_observe",
+            description: "Observe resolver observer fixture.",
+            risk: .observe,
+            probe: probe
+        )
+    )
+    try registry.register(
+        ToolCallResolverObserverTool(
+            identifier: "resolver_observer_mutate",
+            description: "Mutate resolver observer fixture.",
+            risk: .boundedmutate,
+            probe: probe
+        )
     )
 
     return registry

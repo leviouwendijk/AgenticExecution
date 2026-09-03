@@ -187,6 +187,20 @@ enum AgenticExecutionFlowSuite: TestFlowRegistry {
                 .runToolCallResolverObserver()
         },
         TestFlow(
+            "typed-agent-tool-contract",
+            tags: [
+                "agentic-execution",
+                "tools",
+                "typed",
+                "erasure",
+                "observations",
+                "projection",
+            ]
+        ) {
+            try await AgenticExecutionFlowTesting
+                .runTypedAgentToolContract()
+        },
+        TestFlow(
             "tool-policy-directives",
             tags: [
                 "agentic-execution",

@@ -254,7 +254,7 @@ extension AgenticExecutionFlowTesting {
         )
 
         try Expect.equal(
-            registry.tool(
+            registry.registeredTool(
                 named: "host_probe"
             ) != nil,
             true,
@@ -285,18 +285,19 @@ private struct ToolExposureProbeInput:
 }
 
 private struct ToolExposureProbeTool:
-    TypedInstanceAgentTool
+    AgentTool
 {
     typealias Input = ToolExposureProbeInput
+    typealias Output = ToolExposureProbeInput
 
     let identifier: AgentToolIdentifier
     let description: String
     let risk: ActionRisk = .observe
 
     func call(
-        input: JSONValue,
-        workspace _: AgentWorkspace?
-    ) async throws -> JSONValue {
+        _ input: Input,
+        context _: AgentToolExecutionContext
+    ) async throws -> Output {
         input
     }
 }
@@ -304,14 +305,18 @@ private struct ToolExposureProbeTool:
 private struct ToolExposureHostProbeTool:
     AgentTool
 {
+    typealias Input = ToolExposureProbeInput
+    typealias Output = ToolExposureProbeInput
+
     let identifier: AgentToolIdentifier = "host_probe"
     let description = "Trusted host-only exposure fixture."
     let risk: ActionRisk = .observe
+    let modelContract: AgentToolModelContract = .hostOnly
 
     func call(
-        input: JSONValue,
-        workspace _: AgentWorkspace?
-    ) async throws -> JSONValue {
+        _ input: Input,
+        context _: AgentToolExecutionContext
+    ) async throws -> Output {
         input
     }
 }
@@ -325,16 +330,16 @@ private func toolExposureRegistry() throws -> ToolRegistry {
     var registry = ToolRegistry()
 
     try registry.register(
-        [
-            ToolExposureProbeTool(
-                identifier: "alpha_tool",
-                description: "Alpha model-facing exposure fixture."
-            ),
-            ToolExposureProbeTool(
-                identifier: "beta_tool",
-                description: "Beta model-facing exposure fixture."
-            ),
-        ] as [any AgentTool]
+        ToolExposureProbeTool(
+            identifier: "alpha_tool",
+            description: "Alpha model-facing exposure fixture."
+        )
+    )
+    try registry.register(
+        ToolExposureProbeTool(
+            identifier: "beta_tool",
+            description: "Beta model-facing exposure fixture."
+        )
     )
 
     try registry.register(

@@ -1,60 +1,62 @@
 import Agentic
 import AgenticWorkspace
 import Primitives
+import Schema
 
-public protocol AgentTool: Sendable {
+/// Strongly typed author-facing contract for one Agentic tool.
+///
+/// Concrete tools stay in their semantic Input/Output domain. JSONValue only
+/// appears after registration at provider, transcript, checkpoint, and registry
+/// execution boundaries.
+public protocol AgentTool<Input, Output>: Sendable {
+    associatedtype Input:
+        Decodable &
+        Sendable &
+        JSONSchemaProviding
+
+    associatedtype Output:
+        Encodable &
+        Sendable
+
     var identifier: AgentToolIdentifier { get }
     var description: String { get }
-    var inputSchema: JSONValue? { get }
     var risk: ActionRisk { get }
-    var registrationDescriptor: AgentToolRegistrationDescriptor { get }
-
-    func processResult(
-        input: JSONValue,
-        output: JSONValue,
-        workspace: AgentWorkspace?
-    ) -> AgentToolResultProcessing
+    var modelContract: AgentToolModelContract { get }
 
     func preflight(
-        input: JSONValue,
-        workspace: AgentWorkspace?
-    ) async throws -> ToolPreflight
-
-    func preflight(
-        input: JSONValue,
+        _ input: Input,
         context: AgentToolExecutionContext
     ) async throws -> ToolPreflight
 
     func call(
-        input: JSONValue,
-        workspace: AgentWorkspace?
-    ) async throws -> JSONValue
-
-    func call(
-        input: JSONValue,
+        _ input: Input,
         context: AgentToolExecutionContext
-    ) async throws -> JSONValue
+    ) async throws -> Output
+
+    func process(
+        _ output: Output,
+        input: Input,
+        context: AgentToolExecutionContext
+    ) -> AgentToolResultProjection?
 }
 
 public extension AgentTool {
-    var registrationDescriptor: AgentToolRegistrationDescriptor {
-        .hostOnly
-    }
-
-    var inputSchema: JSONValue? {
-        nil
-    }
-
-    func processResult(
-        input _: JSONValue,
-        output _: JSONValue,
-        workspace _: AgentWorkspace?
-    ) -> AgentToolResultProcessing {
-        .none
-    }
-
     var name: String {
         identifier.rawValue
+    }
+
+    var semanticInputSchema: JSONSchema {
+        Input.jsonschema
+    }
+
+    var inputSchema: JSONValue {
+        semanticInputSchema.jsonvalue
+    }
+
+    var modelContract: AgentToolModelContract {
+        .modelFacing(
+            inputSchema: semanticInputSchema
+        )
     }
 
     var definition: AgentToolDefinition {
@@ -67,35 +69,40 @@ public extension AgentTool {
     }
 
     func preflight(
-        input _: JSONValue,
-        workspace: AgentWorkspace?
+        _ input: Input,
+        context: AgentToolExecutionContext
     ) async throws -> ToolPreflight {
-        ToolPreflight(
+        _ = input
+
+        return ToolPreflight(
             toolName: name,
             risk: risk,
-            workspaceRoot: workspace?.rootURL.path,
+            workspaceRoot: context.workspace?.rootURL.path,
             summary: description,
             sideEffects: risk.defaultSideEffects
         )
     }
 
-    func preflight(
-        input: JSONValue,
+    func process(
+        _ output: Output,
+        input: Input,
         context: AgentToolExecutionContext
-    ) async throws -> ToolPreflight {
-        try await preflight(
-            input: input,
-            workspace: context.workspace
-        )
+    ) -> AgentToolResultProjection? {
+        _ = output
+        _ = input
+        _ = context
+        return nil
     }
+}
 
-    func call(
-        input: JSONValue,
-        context: AgentToolExecutionContext
-    ) async throws -> JSONValue {
-        try await call(
-            input: input,
-            workspace: context.workspace
+public extension AgentToolReference {
+    static func tool<T>(
+        _ tool: T,
+        owner: String? = nil
+    ) -> Self where T: AgentTool {
+        .init(
+            identifier: tool.identifier,
+            owner: owner
         )
     }
 }

@@ -5,15 +5,10 @@ extension Agentic {
         public init() {}
 
         public func registry(
-            tools: [any AgentTool] = [],
             toolSets: [any AgentToolSet] = [],
             toolProviders: [any AgentToolProvider] = []
         ) throws -> ToolRegistry {
             var registry = ToolRegistry()
-
-            try registry.register(
-                tools
-            )
 
             for toolSet in toolSets {
                 try registry.register(
@@ -43,12 +38,10 @@ extension Agentic {
         }
 
         public static func registry(
-            tools: [any AgentTool] = [],
             toolSets: [any AgentToolSet] = [],
             toolProviders: [any AgentToolProvider] = []
         ) throws -> ToolRegistry {
             try Self().registry(
-                tools: tools,
                 toolSets: toolSets,
                 toolProviders: toolProviders
             )

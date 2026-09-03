@@ -8,6 +8,26 @@ public enum AgentToolExecutionMode: String, Sendable, Codable, Hashable, CaseIte
     case host_call
 }
 
+public struct AgentToolObservationSink: Sendable {
+    private let handler:
+        @Sendable (AgentToolResultObservation) async -> Void
+
+    public init(
+        _ handler:
+            @escaping @Sendable (AgentToolResultObservation) async -> Void
+    ) {
+        self.handler = handler
+    }
+
+    public func observe(
+        _ observation: AgentToolResultObservation
+    ) async {
+        await handler(
+            observation
+        )
+    }
+}
+
 public struct AgentToolExecutionContext: Sendable {
     public let workspace: AgentWorkspace?
     public let workspaceLocation: WorkspaceLocation?
@@ -17,6 +37,7 @@ public struct AgentToolExecutionContext: Sendable {
     public let executionMode: AgentToolExecutionMode
     public let guidelineRelations: [AgentGuidelineRelation]
     public let metadata: [String: String]
+    public let observationSink: AgentToolObservationSink?
 
     public init(
         workspace: AgentWorkspace? = nil,
@@ -26,7 +47,8 @@ public struct AgentToolExecutionContext: Sendable {
         preparedIntentID: PreparedIntentIdentifier? = nil,
         executionMode: AgentToolExecutionMode = .host_call,
         guidelineRelations: [AgentGuidelineRelation] = [],
-        metadata: [String: String] = [:]
+        metadata: [String: String] = [:],
+        observationSink: AgentToolObservationSink? = nil
     ) {
         self.workspace = workspace
         self.workspaceLocation = workspaceLocation
@@ -36,11 +58,36 @@ public struct AgentToolExecutionContext: Sendable {
         self.executionMode = executionMode
         self.guidelineRelations = guidelineRelations
         self.metadata = metadata
+        self.observationSink = observationSink
     }
 
     public var workingDirectoryURL: URL? {
         workspaceLocation?.absoluteURL
             ?? workspace?.rootURL
+    }
+
+    public func observe(
+        _ observation: AgentToolResultObservation
+    ) async {
+        await observationSink?.observe(
+            observation
+        )
+    }
+
+    public func withObservationSink(
+        _ observationSink: AgentToolObservationSink?
+    ) -> Self {
+        .init(
+            workspace: workspace,
+            workspaceLocation: workspaceLocation,
+            sessionID: sessionID,
+            toolCallID: toolCallID,
+            preparedIntentID: preparedIntentID,
+            executionMode: executionMode,
+            guidelineRelations: guidelineRelations,
+            metadata: metadata,
+            observationSink: observationSink
+        )
     }
 
     public func withWorkspaceLocation(
@@ -54,7 +101,8 @@ public struct AgentToolExecutionContext: Sendable {
             preparedIntentID: preparedIntentID,
             executionMode: executionMode,
             guidelineRelations: guidelineRelations,
-            metadata: metadata
+            metadata: metadata,
+            observationSink: observationSink
         )
     }
 
@@ -69,7 +117,8 @@ public struct AgentToolExecutionContext: Sendable {
             preparedIntentID: preparedIntentID,
             executionMode: executionMode,
             guidelineRelations: guidelineRelations,
-            metadata: metadata
+            metadata: metadata,
+            observationSink: observationSink
         )
     }
 
@@ -84,7 +133,8 @@ public struct AgentToolExecutionContext: Sendable {
             preparedIntentID: preparedIntentID,
             executionMode: executionMode,
             guidelineRelations: guidelineRelations,
-            metadata: metadata
+            metadata: metadata,
+            observationSink: observationSink
         )
     }
 
@@ -99,7 +149,8 @@ public struct AgentToolExecutionContext: Sendable {
             preparedIntentID: preparedIntentID,
             executionMode: executionMode,
             guidelineRelations: guidelineRelations,
-            metadata: metadata
+            metadata: metadata,
+            observationSink: observationSink
         )
     }
 
@@ -124,7 +175,8 @@ public struct AgentToolExecutionContext: Sendable {
             preparedIntentID: preparedIntentID,
             executionMode: executionMode,
             guidelineRelations: guidelineRelations,
-            metadata: metadata
+            metadata: metadata,
+            observationSink: observationSink
         )
     }
 
@@ -143,7 +195,8 @@ public struct AgentToolExecutionContext: Sendable {
                 additionalMetadata
             ) { _, new in
                 new
-            }
+            },
+            observationSink: observationSink
         )
     }
 }

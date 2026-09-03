@@ -1,6 +1,7 @@
 import Agentic
 import AgenticExecution
 import Primitives
+import Schema
 import TestFlows
 import Foundation
 
@@ -675,21 +676,16 @@ enum AgenticExecutionFlowTesting {
 
     static func runToolPlanApprovalSkip() async throws -> [TestFlowDiagnostic] {
         let probe = PlanRunProbe()
-        let tool = ClosureAgentTool(
+        let tool = PlanRunProbeTool(
             identifier: "tool_plan_approval_skip_probe",
             description: "Records ToolPlan execution while one reviewed call is explicitly skipped.",
-            risk: .boundedmutate
-        ) { value, _ in
-            try await probe.invoke(
-                value
-            )
-        }
+            risk: .boundedmutate,
+            probe: probe
+        )
         let invoker = ToolInvoker(
-            registry: ToolRegistry(
-                tools: [
-                    tool,
-                ]
-            ),
+            registry: try ToolRegistry {
+                tool
+            },
             policy: ToolExecutionPolicy(
                 autonomyMode: .auto_observe
             )
@@ -816,20 +812,16 @@ private extension AgenticExecutionFlowTesting {
 
     static func makeFixture() throws -> Fixture {
         let probe = PlanRunProbe()
-        let tool = ClosureAgentTool(
+        let tool = PlanRunProbeTool(
             identifier: "tool_plan_run_probe",
-            description: "Records execution order and fails the repair marker once."
-        ) { value, _ in
-            try await probe.invoke(
-                value
-            )
-        }
+            description: "Records execution order and fails the repair marker once.",
+            risk: .observe,
+            probe: probe
+        )
         let invoker = ToolInvoker(
-            registry: ToolRegistry(
-                tools: [
-                    tool,
-                ]
-            ),
+            registry: try ToolRegistry {
+                tool
+            },
             policy: ToolExecutionPolicy(
                 autonomyMode: .auto_observe
             )
@@ -882,18 +874,34 @@ private extension AgenticExecutionFlowTesting {
     }
 }
 
+private struct PlanRunProbeTool:
+    AgentTool
+{
+    typealias Input = RunProbeInput
+    typealias Output = RunProbeInput
+
+    let identifier: AgentToolIdentifier
+    let description: String
+    let risk: ActionRisk
+    let probe: PlanRunProbe
+
+    func call(
+        _ input: Input,
+        context _: AgentToolExecutionContext
+    ) async throws -> Output {
+        try await probe.invoke(
+            input
+        )
+    }
+}
+
 private actor PlanRunProbe {
     private var invocations: [String] = []
     private var repairFailed = false
 
     func invoke(
-        _ value: JSONValue
-    ) throws -> JSONValue {
-        let input = try JSONToolBridge.decode(
-            RunProbeInput.self,
-            from: value
-        )
-
+        _ input: RunProbeInput
+    ) throws -> RunProbeInput {
         invocations.append(
             input.marker
         )
@@ -905,7 +913,7 @@ private actor PlanRunProbe {
             throw RunProbeError.firstRepairAttempt
         }
 
-        return value
+        return input
     }
 
     func invocationLog() -> String {
@@ -918,9 +926,19 @@ private actor PlanRunProbe {
 private struct RunProbeInput:
     Sendable,
     Codable,
+    JSONSchemaProviding,
     Hashable
 {
     let marker: String
+
+    static var jsonschema: JSONSchema {
+        JSONSchema.object {
+            JSONSchema.string(
+                "marker",
+                required: true
+            )
+        }
+    }
 }
 
 private enum RunProbeError: Error {

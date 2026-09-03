@@ -12,7 +12,7 @@ public extension ToolRegistry {
                 continue
             }
 
-            guard let tool = tool(
+            guard let tool = registeredTool(
                 identifiedBy: identifier
             ) else {
                 throw ModeApplicationError.missingTool(

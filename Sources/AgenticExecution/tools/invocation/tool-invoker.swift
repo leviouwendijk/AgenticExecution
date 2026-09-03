@@ -129,7 +129,7 @@ private extension ToolInvoker {
             return context
         }
 
-        guard let tool = registry.tool(
+        guard let tool = registry.registeredTool(
             named: call.name
         ) else {
             throw ToolDispatchError.unknownTool(
@@ -137,7 +137,7 @@ private extension ToolInvoker {
             )
         }
 
-        guard tool is any WorkspaceTargetableTool else {
+        guard tool.capability.supportsWorkspaceTargeting else {
             throw WorkspaceToolTargetingError.unsupportedTool(
                 call.name
             )

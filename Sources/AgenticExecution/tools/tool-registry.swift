@@ -6,23 +6,8 @@ public struct ToolRegistry: Sendable {
     private var tools:
         [AgentToolIdentifier: RegisteredAgentTool]
 
-    public init(
-        tools: [any AgentTool] = []
-    ) {
-        self.tools = Dictionary(
-            uniqueKeysWithValues:
-                tools.map { tool in
-                    let registered =
-                        RegisteredAgentTool(
-                            tool
-                        )
-
-                    return (
-                        tool.identifier,
-                        registered
-                    )
-                }
-        )
+    public init() {
+        self.tools = [:]
     }
 
     public var definitions: [AgentToolDefinition] {
@@ -115,10 +100,21 @@ public struct ToolRegistry: Sendable {
         tools.count
     }
 
+    public mutating func register<T>(
+        _ tool: T
+    ) throws where T: AgentTool {
+        try register(
+            RegisteredAgentTool(
+                tool
+            )
+        )
+    }
+
     public mutating func register(
-        _ tool: any AgentTool
+        _ registered: RegisteredAgentTool
     ) throws {
-        let identifier = tool.identifier
+        let identifier =
+            registered.capability.definition.identifier
 
         guard tools[identifier] == nil else {
             throw ToolRegistryError.duplicateTool(
@@ -126,20 +122,7 @@ public struct ToolRegistry: Sendable {
             )
         }
 
-        tools[identifier] =
-            RegisteredAgentTool(
-                tool
-            )
-    }
-
-    public mutating func register(
-        _ tools: [any AgentTool]
-    ) throws {
-        for tool in tools {
-            try register(
-                tool
-            )
-        }
+        tools[identifier] = registered
     }
 
     public mutating func register(
@@ -173,24 +156,6 @@ public struct ToolRegistry: Sendable {
                     name
                 )
         )
-    }
-
-    public func tool(
-        identifiedBy identifier: AgentToolIdentifier
-    ) -> (any AgentTool)? {
-        registeredTool(
-            identifiedBy: identifier
-        )?
-        .tool
-    }
-
-    public func tool(
-        named name: String
-    ) -> (any AgentTool)? {
-        registeredTool(
-            named: name
-        )?
-        .tool
     }
 
     public func parseModelCall(
@@ -231,20 +196,19 @@ public struct ToolRegistry: Sendable {
         _ toolCall: AgentToolCall,
         context: AgentToolExecutionContext
     ) async throws -> ToolPreflight {
-        guard let tool = tool(
-            named: toolCall.name
-        ) else {
+        guard let registered =
+            registeredTool(
+                named: toolCall.name
+            )
+        else {
             throw ToolDispatchError.unknownTool(
                 toolCall.name
             )
         }
 
-        return try await tool.preflight(
-            input: toolCall.input,
-            context:
-                context.withToolCallID(
-                    toolCall.id
-                )
+        return try await registered.preflight(
+            toolCall,
+            context: context
         )
     }
 
@@ -252,45 +216,11 @@ public struct ToolRegistry: Sendable {
         _ toolCall: AgentToolCall,
         workspace: AgentWorkspace?
     ) async throws -> AgentToolResult {
-        guard let tool = tool(
-            named: toolCall.name
-        ) else {
-            throw ToolDispatchError.unknownTool(
-                toolCall.name
-            )
-        }
-
-        let output: JSONValue
-        let isError: Bool
-
-        do {
-            output = try await tool.call(
-                input: toolCall.input,
+        try await execute(
+            toolCall,
+            context: .init(
                 workspace: workspace
             )
-            isError = false
-        } catch let failure
-            as AgentToolReportedFailure
-        {
-            output = failure.output
-            isError = true
-        }
-
-        let processing = tool.processResult(
-            input: toolCall.input,
-            output: output,
-            workspace: workspace
-        )
-
-        return AgentToolResult(
-            toolCallID: toolCall.id,
-            name: tool.identifier.rawValue,
-            output: output,
-            processing:
-                processing.isEmpty
-                    ? nil
-                    : processing,
-            isError: isError
         )
     }
 }
