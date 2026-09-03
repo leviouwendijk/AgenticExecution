@@ -1,5 +1,5 @@
 {
-  "originHash" : "d0382d62d6def6a4d8adde64070b57eb026fa0d584a39a27b1dfd1267e69fe5f",
+  "originHash" : "b094c7d368c3086c32c39626f8cd4446246c08658bf4000870bb9fd129050502",
   "pins" : [
     {
       "identity" : "agentic",
@@ -7,7 +7,7 @@
       "location" : "https://github.com/leviouwendijk/Agentic.git",
       "state" : {
         "branch" : "master",
-        "revision" : "3e0fca006137bdf31b6cc85ccc1cf8ee490c2793"
+        "revision" : "90c11eb5beb90868f3e4bf07280d0faac0e8d6ed"
       }
     },
     {
@@ -16,7 +16,7 @@
       "location" : "https://github.com/leviouwendijk/AgenticWorkspace.git",
       "state" : {
         "branch" : "master",
-        "revision" : "49fa47b13403ae7e9eb1653ac5e730f17c2ca1b3"
+        "revision" : "a0ec00d7bc584110398979512585a3bee7e2d2be"
       }
     },
     {
@@ -34,7 +34,16 @@
       "location" : "https://github.com/leviouwendijk/Difference.git",
       "state" : {
         "branch" : "master",
-        "revision" : "3fa70acbc0b96bbaf5a5021e362b48e399ca6c1e"
+        "revision" : "7d295238c789f009fd720f3cf5ca8e730068c0c5"
+      }
+    },
+    {
+      "identity" : "dsl",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/leviouwendijk/DSL.git",
+      "state" : {
+        "branch" : "master",
+        "revision" : "9efff74e61ff3679fce19f3cbf6df09c3bc23691"
       }
     },
     {
@@ -52,7 +61,7 @@
       "location" : "https://github.com/leviouwendijk/Guidelines.git",
       "state" : {
         "branch" : "master",
-        "revision" : "a39e1130e31588a1f21dc24aeeb8fb0a1357c7f1"
+        "revision" : "0a5bd3f30af7eaeb79c0ac37007f10322920f95a"
       }
     },
     {
@@ -106,7 +115,7 @@
       "location" : "https://github.com/leviouwendijk/Primitives.git",
       "state" : {
         "branch" : "master",
-        "revision" : "685ba8ee4bc678c957502e7dde25c59d0c192d4a"
+        "revision" : "3b9e65785ecb8aa493c55893f61619b6967ce10d"
       }
     },
     {
@@ -133,7 +142,7 @@
       "location" : "https://github.com/leviouwendijk/Schema.git",
       "state" : {
         "branch" : "master",
-        "revision" : "c1b0f99a0b7ffdda0e2a566b656709996a4a3ae3"
+        "revision" : "f23bd9c256f0d7b428c30db68bcd097a3a19c63a"
       }
     },
     {
@@ -160,7 +169,7 @@
       "location" : "https://github.com/leviouwendijk/Terminal.git",
       "state" : {
         "branch" : "master",
-        "revision" : "d11451d89d1617ce912e33723d6194acad384838"
+        "revision" : "ef6faf11fdedbc727f22f5a6c5e908caaed32459"
       }
     },
     {

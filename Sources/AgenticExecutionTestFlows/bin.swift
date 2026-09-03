@@ -161,6 +161,19 @@ enum AgenticExecutionFlowSuite: TestFlowRegistry {
                 .runToolExposureRegistryPreservation()
         },
         TestFlow(
+            "tool-call-resolver",
+            tags: [
+                "agentic-execution",
+                "tools",
+                "resolver",
+                "exposure",
+                "approval",
+            ]
+        ) {
+            try await AgenticExecutionFlowTesting
+                .runToolCallResolver()
+        },
+        TestFlow(
             "tool-policy-directives",
             tags: [
                 "agentic-execution",
