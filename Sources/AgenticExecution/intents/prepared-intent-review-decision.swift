@@ -1,8 +1,23 @@
-public enum PreparedIntentReviewDecision: String, Sendable, Codable, Hashable, CaseIterable {
+import Schema
+
+public enum PreparedIntentReviewDecision:
+    String,
+    Sendable,
+    Codable,
+    Hashable,
+    CaseIterable,
+    JSONSchemaProviding
+{
     case approve
     case deny
     case cancel
     case expire
+
+    public static var jsonschema: JSONSchema {
+        .string(
+            cases: allCases.map(\.rawValue)
+        )
+    }
 }
 
 public extension PreparedIntentReviewDecision {

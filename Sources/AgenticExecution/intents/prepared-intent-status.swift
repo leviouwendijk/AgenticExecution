@@ -1,4 +1,13 @@
-public enum PreparedIntentStatus: String, Sendable, Codable, Hashable, CaseIterable {
+import Schema
+
+public enum PreparedIntentStatus:
+    String,
+    Sendable,
+    Codable,
+    Hashable,
+    CaseIterable,
+    JSONSchemaProviding
+{
     case pending_review
     case approved
     case denied
@@ -6,6 +15,12 @@ public enum PreparedIntentStatus: String, Sendable, Codable, Hashable, CaseItera
     case expired
     case executed
     case execution_failed
+
+    public static var jsonschema: JSONSchema {
+        .string(
+            cases: allCases.map(\.rawValue)
+        )
+    }
 }
 
 public extension PreparedIntentStatus {
