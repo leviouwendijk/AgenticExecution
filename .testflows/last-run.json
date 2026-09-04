@@ -3,12 +3,12 @@
   "failed_names" : [
 
   ],
-  "generated_at" : "2026-09-01T10:21:45Z",
-  "passed" : 6,
+  "generated_at" : "2026-09-04T13:01:22Z",
+  "passed" : 15,
   "results" : [
     {
       "display_name" : "tool-plan-run-retry-resume",
-      "duration_seconds" : 0.010679006576538086,
+      "duration_seconds" : 0.008271932601928711,
       "name" : "tool-plan-run-retry-resume",
       "status" : "passed",
       "tags" : [
@@ -21,8 +21,23 @@
       ]
     },
     {
+      "display_name" : "tool-plan-failure-branch-retry-resume",
+      "duration_seconds" : 0.0003070831298828125,
+      "name" : "tool-plan-failure-branch-retry-resume",
+      "status" : "passed",
+      "tags" : [
+        "agentic-execution",
+        "on-failure",
+        "path",
+        "resolution",
+        "resume",
+        "retry",
+        "tool-plan"
+      ]
+    },
+    {
       "display_name" : "tool-plan-run-skip-resume",
-      "duration_seconds" : 0.00012493133544921875,
+      "duration_seconds" : 0.00010609626770019531,
       "name" : "tool-plan-run-skip-resume",
       "status" : "passed",
       "tags" : [
@@ -36,7 +51,7 @@
     },
     {
       "display_name" : "tool-plan-execution-policy-model",
-      "duration_seconds" : 1.2993812561035156e-05,
+      "duration_seconds" : 1.3947486877441406e-05,
       "name" : "tool-plan-execution-policy-model",
       "status" : "passed",
       "tags" : [
@@ -48,7 +63,7 @@
     },
     {
       "display_name" : "tool-plan-single-step-start",
-      "duration_seconds" : 6.103515625e-05,
+      "duration_seconds" : 7.092952728271484e-05,
       "name" : "tool-plan-single-step-start",
       "status" : "passed",
       "tags" : [
@@ -61,7 +76,7 @@
     },
     {
       "display_name" : "tool-plan-single-step-resume",
-      "duration_seconds" : 0.00018107891082763672,
+      "duration_seconds" : 0.00021708011627197266,
       "name" : "tool-plan-single-step-resume",
       "status" : "passed",
       "tags" : [
@@ -76,7 +91,7 @@
     },
     {
       "display_name" : "tool-plan-approval-skip-continues",
-      "duration_seconds" : 8.594989776611328e-05,
+      "duration_seconds" : 9.906291961669922e-05,
       "name" : "tool-plan-approval-skip-continues",
       "status" : "passed",
       "tags" : [
@@ -86,9 +101,113 @@
         "skip",
         "tool-plan"
       ]
+    },
+    {
+      "display_name" : "tool-exposure-all",
+      "duration_seconds" : 7.200241088867188e-05,
+      "name" : "tool-exposure-all",
+      "status" : "passed",
+      "tags" : [
+        "agentic-execution",
+        "all",
+        "exposure",
+        "tools"
+      ]
+    },
+    {
+      "display_name" : "tool-exposure-explicit",
+      "duration_seconds" : 5.4001808166503906e-05,
+      "name" : "tool-exposure-explicit",
+      "status" : "passed",
+      "tags" : [
+        "agentic-execution",
+        "enforcement",
+        "explicit",
+        "exposure",
+        "tools"
+      ]
+    },
+    {
+      "display_name" : "tool-exposure-discoverable",
+      "duration_seconds" : 3.4928321838378906e-05,
+      "name" : "tool-exposure-discoverable",
+      "status" : "passed",
+      "tags" : [
+        "activation",
+        "agentic-execution",
+        "discovery",
+        "exposure",
+        "tools"
+      ]
+    },
+    {
+      "display_name" : "tool-exposure-registry-preservation",
+      "duration_seconds" : 2.5987625122070312e-05,
+      "name" : "tool-exposure-registry-preservation",
+      "status" : "passed",
+      "tags" : [
+        "agentic-execution",
+        "exposure",
+        "host-only",
+        "registry",
+        "tools"
+      ]
+    },
+    {
+      "display_name" : "tool-call-resolver",
+      "duration_seconds" : 0.0001609325408935547,
+      "name" : "tool-call-resolver",
+      "status" : "passed",
+      "tags" : [
+        "agentic-execution",
+        "approval",
+        "exposure",
+        "resolver",
+        "tools"
+      ]
+    },
+    {
+      "display_name" : "tool-call-resolver-observer",
+      "duration_seconds" : 7.092952728271484e-05,
+      "name" : "tool-call-resolver-observer",
+      "status" : "passed",
+      "tags" : [
+        "agentic-execution",
+        "approval",
+        "observer",
+        "resolver",
+        "tools"
+      ]
+    },
+    {
+      "display_name" : "typed-agent-tool-contract",
+      "duration_seconds" : 0.00898897647857666,
+      "name" : "typed-agent-tool-contract",
+      "status" : "passed",
+      "tags" : [
+        "agentic-execution",
+        "erasure",
+        "observations",
+        "projection",
+        "tools",
+        "typed"
+      ]
+    },
+    {
+      "display_name" : "tool-policy-directives",
+      "duration_seconds" : 4.601478576660156e-05,
+      "name" : "tool-policy-directives",
+      "status" : "passed",
+      "tags" : [
+        "agentic-execution",
+        "approval",
+        "escalation",
+        "policy",
+        "preflight"
+      ]
     }
   ],
   "skipped" : 0,
   "title" : "AgenticExecution flow tests",
-  "total" : 6
+  "total" : 15
 }
