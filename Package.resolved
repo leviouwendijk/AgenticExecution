@@ -1,5 +1,5 @@
 {
-  "originHash" : "b094c7d368c3086c32c39626f8cd4446246c08658bf4000870bb9fd129050502",
+  "originHash" : "32b81232b2efaee7c2e405383149c978cacb102706da60b41b1e1d92e393af64",
   "pins" : [
     {
       "identity" : "agentic",
@@ -43,7 +43,7 @@
       "location" : "https://github.com/leviouwendijk/DSL.git",
       "state" : {
         "branch" : "master",
-        "revision" : "9efff74e61ff3679fce19f3cbf6df09c3bc23691"
+        "revision" : "30ec6798f883b91f697d060bb001e0e4f7a09225"
       }
     },
     {
@@ -146,6 +146,15 @@
       }
     },
     {
+      "identity" : "schemamacros",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/leviouwendijk/SchemaMacros.git",
+      "state" : {
+        "branch" : "master",
+        "revision" : "2441b49a5159c375b094672a0ba0ae338829ec32"
+      }
+    },
+    {
       "identity" : "selection",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/leviouwendijk/Selection.git",
@@ -161,6 +170,15 @@
       "state" : {
         "branch" : "master",
         "revision" : "86a939d7bbb3e25808f88fbcedcee4069a5a5ae1"
+      }
+    },
+    {
+      "identity" : "swift-syntax",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/swiftlang/swift-syntax.git",
+      "state" : {
+        "revision" : "79e4b74a295b6eb74a8b585e3a39d29e70c1dbd1",
+        "version" : "603.0.2"
       }
     },
     {

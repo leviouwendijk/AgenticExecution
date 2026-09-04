@@ -227,5 +227,18 @@ enum AgenticExecutionFlowSuite: TestFlowRegistry {
             try AgenticExecutionFlowTesting
                 .runToolPolicyDirectives()
         },
+        TestFlow(
+            "tool-registry-intrinsics",
+            tags: [
+                "agentic-execution",
+                "tools",
+                "registry",
+                "intrinsic",
+                "bootstrap",
+            ]
+        ) {
+            try await AgenticExecutionFlowTesting
+                .runToolRegistryIntrinsics()
+        },
     ]
 }
