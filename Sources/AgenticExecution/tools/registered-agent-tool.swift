@@ -10,7 +10,7 @@ public struct RegisteredAgentTool: Sendable {
     public let capability: AgentToolCapability
 
     private let parseModelInputHandler:
-        @Sendable (JSONValue) throws -> Void
+        @Sendable (AgentToolCall) throws -> Void
 
     private let preflightHandler:
         @Sendable (
@@ -24,7 +24,8 @@ public struct RegisteredAgentTool: Sendable {
             AgentToolExecutionContext
         ) async throws -> (
             output: JSONValue,
-            projection: AgentToolResultProjection?
+            projection: AgentToolResultProjection?,
+            isError: Bool
         )
 
     public init<T>(
@@ -38,71 +39,130 @@ public struct RegisteredAgentTool: Sendable {
 
         self.capability = capability
 
-        self.parseModelInputHandler = { value in
-            _ = try JSONToolBridge.decode(
-                T.Input.self,
-                from: value
-            )
+        self.parseModelInputHandler = { call in
+            do {
+                _ = try JSONToolBridge.decode(
+                    T.Input.self,
+                    from: call.input
+                )
+            } catch {
+                throw phasedToolCallError(
+                    tool: tool.identifier,
+                    call: call,
+                    phase: .decode,
+                    error: error
+                )
+            }
         }
 
         self.preflightHandler = { call, context in
-            let input = try JSONToolBridge.decode(
-                T.Input.self,
-                from: call.input
-            )
+            let input: T.Input
 
-            return try await tool.preflight(
-                input,
-                context: context
-            )
+            do {
+                input = try JSONToolBridge.decode(
+                    T.Input.self,
+                    from: call.input
+                )
+            } catch {
+                throw phasedToolCallError(
+                    tool: tool.identifier,
+                    call: call,
+                    phase: .decode,
+                    error: error
+                )
+            }
+
+            do {
+                return try await tool.preflight(
+                    input,
+                    context: context
+                )
+            } catch {
+                throw phasedToolCallError(
+                    tool: tool.identifier,
+                    call: call,
+                    phase: .preflight,
+                    error: error
+                )
+            }
         }
 
         self.callHandler = { call, context in
-            let input = try JSONToolBridge.decode(
-                T.Input.self,
-                from: call.input
-            )
-            let output = try await tool.call(
-                input,
-                context: context
-            )
-            let projection = tool.process(
-                output,
-                input: input,
-                context: context
-            )
+            let input: T.Input
+
+            do {
+                input = try JSONToolBridge.decode(
+                    T.Input.self,
+                    from: call.input
+                )
+            } catch {
+                throw phasedToolCallError(
+                    tool: tool.identifier,
+                    call: call,
+                    phase: .decode,
+                    error: error
+                )
+            }
+
+            let output: T.Output
+            let isError: Bool
+
+            do {
+                output = try await tool.call(
+                    input,
+                    context: context
+                )
+                isError = false
+            } catch let failure as AgentToolReportedFailure<T.Output> {
+                output = failure.output
+                isError = true
+            } catch {
+                throw phasedToolCallError(
+                    tool: tool.identifier,
+                    call: call,
+                    phase: .call,
+                    error: error
+                )
+            }
+
+            let projection: AgentToolResultProjection?
+
+            do {
+                projection = try tool.process(
+                    output,
+                    input: input,
+                    context: context
+                )
+            } catch {
+                throw phasedToolCallError(
+                    tool: tool.identifier,
+                    call: call,
+                    phase: .process,
+                    error: error
+                )
+            }
+
+            let encodedOutput: JSONValue
+
+            do {
+                encodedOutput = try JSONToolBridge.encode(
+                    output
+                )
+            } catch {
+                throw phasedToolCallError(
+                    tool: tool.identifier,
+                    call: call,
+                    phase: .encode,
+                    error: error
+                )
+            }
 
             return (
-                output: try JSONToolBridge.encode(
-                    output
-                ),
-                projection: projection
+                output: encodedOutput,
+                projection: projection,
+                isError: isError
             )
         }
-    }
-
-    init(
-        capability: AgentToolCapability,
-        parseModelInput:
-            @escaping @Sendable (JSONValue) throws -> Void,
-        preflight:
-            @escaping @Sendable (
-                AgentToolCall,
-                AgentToolExecutionContext
-            ) async throws -> ToolPreflight,
-        call:
-            @escaping @Sendable (
-                AgentToolCall,
-                AgentToolExecutionContext
-            ) async throws -> (
-                output: JSONValue,
-                projection: AgentToolResultProjection?
-            )
-    ) {
-        self.capability = capability
-        self.parseModelInputHandler = parseModelInput
-        self.preflightHandler = preflight
-        self.callHandler = call
     }
 
     public func parseModelCall(
@@ -114,16 +174,9 @@ public struct RegisteredAgentTool: Sendable {
             )
         }
 
-        do {
-            try parseModelInputHandler(
-                call.input
-            )
-        } catch {
-            throw RegisteredAgentToolError.invalidModelCall(
-                tool: capability.definition.name,
-                reason: error.localizedDescription
-            )
-        }
+        try parseModelInputHandler(
+            call
+        )
 
         return ParsedAgentToolCall(
             call: call,
@@ -165,38 +218,24 @@ public struct RegisteredAgentTool: Sendable {
                 observationSink
             )
 
-        let output: JSONValue
-        let projection: AgentToolResultProjection?
-        let isError: Bool
-
-        do {
-            let execution = try await callHandler(
-                call,
-                executionContext
-            )
-            output = execution.output
-            projection = execution.projection
-            isError = false
-        } catch let failure as AgentToolReportedFailure {
-            output = failure.output
-            projection = nil
-            isError = true
-        }
-
+        let execution = try await callHandler(
+            call,
+            executionContext
+        )
         let processing = AgentToolResultProcessing(
-            projection: projection,
+            projection: execution.projection,
             observations: await recorder.snapshot()
         )
 
         return AgentToolResult(
             toolCallID: call.id,
             name: capability.definition.name,
-            output: output,
+            output: execution.output,
             processing:
                 processing.isEmpty
                     ? nil
                     : processing,
-            isError: isError
+            isError: execution.isError
         )
     }
 }
@@ -240,6 +279,24 @@ public enum RegisteredAgentToolError:
             "Cannot parse model input for registered tool '\(tool)': \(reason)"
         }
     }
+}
+
+private func phasedToolCallError(
+    tool: AgentToolIdentifier,
+    call: AgentToolCall,
+    phase: AgentToolCallPhase,
+    error: any Error
+) -> AgentToolCallError {
+    if let error = error as? AgentToolCallError {
+        return error
+    }
+
+    return AgentToolCallError(
+        tool: tool,
+        toolCallID: call.id,
+        phase: phase,
+        underlying: error
+    )
 }
 
 private actor AgentToolObservationRecorder {

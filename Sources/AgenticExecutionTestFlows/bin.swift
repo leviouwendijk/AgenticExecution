@@ -201,6 +201,20 @@ enum AgenticExecutionFlowSuite: TestFlowRegistry {
                 .runTypedAgentToolContract()
         },
         TestFlow(
+            "tool-call-failure-envelope",
+            tags: [
+                "agentic-execution",
+                "tools",
+                "failure",
+                "phase",
+                "reported-failure",
+                "persistence",
+            ]
+        ) {
+            try await AgenticExecutionFlowTesting
+                .runToolCallFailureEnvelope()
+        },
+        TestFlow(
             "tool-policy-directives",
             tags: [
                 "agentic-execution",

@@ -38,7 +38,7 @@ public protocol AgentTool<Input, Output>: Sendable {
         _ output: Output,
         input: Input,
         context: AgentToolExecutionContext
-    ) -> AgentToolResultProjection?
+    ) throws -> AgentToolResultProjection?
 }
 
 public extension AgentTool {

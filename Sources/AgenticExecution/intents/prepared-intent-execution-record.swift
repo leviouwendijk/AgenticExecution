@@ -28,6 +28,7 @@ public struct PreparedIntentExecutionRecord: Sendable, Codable, Hashable, Identi
     public let startedAt: Date
     public let completedAt: Date
     public let result: JSONValue?
+    public let toolFailure: AgentToolCallFailure?
     public let errorMessage: String?
     public let metadata: [String: String]
 
@@ -40,6 +41,7 @@ public struct PreparedIntentExecutionRecord: Sendable, Codable, Hashable, Identi
         startedAt: Date = Date(),
         completedAt: Date = Date(),
         result: JSONValue? = nil,
+        toolFailure: AgentToolCallFailure? = nil,
         errorMessage: String? = nil,
         metadata: [String: String] = [:]
     ) {
@@ -51,6 +53,7 @@ public struct PreparedIntentExecutionRecord: Sendable, Codable, Hashable, Identi
         self.startedAt = startedAt
         self.completedAt = completedAt
         self.result = result
+        self.toolFailure = toolFailure
         self.errorMessage = errorMessage
         self.metadata = metadata
     }

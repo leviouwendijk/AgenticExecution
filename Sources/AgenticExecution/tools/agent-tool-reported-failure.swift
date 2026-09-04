@@ -1,13 +1,15 @@
-import Primitives
-
-public struct AgentToolReportedFailure:
+public struct AgentToolReportedFailure<Output>:
     Error,
     Sendable
+where
+    Output:
+        Encodable &
+        Sendable
 {
-    public let output: JSONValue
+    public let output: Output
 
     public init(
-        output: JSONValue
+        output: Output
     ) {
         self.output = output
     }

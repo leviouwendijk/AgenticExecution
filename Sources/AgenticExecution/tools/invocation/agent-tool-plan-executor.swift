@@ -113,6 +113,9 @@ private extension AgentToolPlanExecutor {
                 path: path,
                 call: call,
                 outcome: .failed,
+                toolFailure:
+                    (error as? AgentToolCallError)?
+                        .failure,
                 errorDescription: errorText(
                     error
                 )

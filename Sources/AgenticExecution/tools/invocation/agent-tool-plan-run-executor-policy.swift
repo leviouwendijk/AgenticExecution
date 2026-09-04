@@ -412,6 +412,7 @@ private extension AgentToolPlanResult {
                     call: record.call,
                     outcome: record.outcome,
                     invocation: record.invocation,
+                    toolFailure: record.toolFailure,
                     errorDescription: record.errorDescription,
                     skipReason: record.skipReason
                 )

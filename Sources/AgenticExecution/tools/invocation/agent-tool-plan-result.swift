@@ -25,6 +25,7 @@ public struct AgentToolPlanRecord:
     public let call: AgentToolCall
     public let outcome: AgentToolPlanOutcome
     public let invocation: ToolInvocation.Result?
+    public let toolFailure: AgentToolCallFailure?
     public let errorDescription: String?
     public let skipReason: String?
 
@@ -33,6 +34,7 @@ public struct AgentToolPlanRecord:
         call: AgentToolCall,
         outcome: AgentToolPlanOutcome,
         invocation: ToolInvocation.Result? = nil,
+        toolFailure: AgentToolCallFailure? = nil,
         errorDescription: String? = nil,
         skipReason: String? = nil
     ) {
@@ -40,6 +42,7 @@ public struct AgentToolPlanRecord:
         self.call = call
         self.outcome = outcome
         self.invocation = invocation
+        self.toolFailure = toolFailure
         self.errorDescription = errorDescription
         self.skipReason = skipReason
     }
