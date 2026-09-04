@@ -49,6 +49,64 @@ public actor AgentToolExposure {
         )
     }
 
+    /// Inspect live exposure against immutable completed-registry metadata.
+    /// Stale configured identifiers are ignored and results are deterministic.
+    public func inspect(
+        in registryInspection: AgentToolRegistryInspection
+    ) -> AgentToolExposureInspection {
+        let registered = Set(
+            registryInspection.tools
+                .filter(\.isModelFacing)
+                .map(\.identifier)
+        )
+
+        let exposed: Set<AgentToolIdentifier>
+        let seeded: Set<AgentToolIdentifier>
+        let activated: Set<AgentToolIdentifier>
+
+        switch policy {
+        case .all:
+            exposed = registered
+            seeded = []
+            activated = []
+
+        case .explicit(let identifiers):
+            seeded =
+                Set(identifiers).intersection(registered)
+            exposed =
+                activeIdentifiers.intersection(registered)
+            activated = []
+
+        case .discoverable(let identifiers):
+            seeded =
+                Set(identifiers).intersection(registered)
+            exposed =
+                activeIdentifiers.intersection(registered)
+            activated =
+                exposed.subtracting(seeded)
+        }
+
+        let hidden =
+            registered.subtracting(exposed)
+
+        func ordered(
+            _ identifiers: Set<AgentToolIdentifier>
+        ) -> [AgentToolIdentifier] {
+            identifiers.sorted {
+                $0.rawValue < $1.rawValue
+            }
+        }
+
+        return .init(
+            policy: policy,
+            registeredModelFacingCount: registered.count,
+            exposedIdentifiers: ordered(exposed),
+            hiddenIdentifiers: ordered(hidden),
+            seededIdentifiers: ordered(seeded),
+            activatedIdentifiers: ordered(activated)
+        )
+    }
+
     public func isExposed(
         _ identifier: AgentToolIdentifier,
         in registry: ToolRegistry

@@ -240,5 +240,17 @@ enum AgenticExecutionFlowSuite: TestFlowRegistry {
             try await AgenticExecutionFlowTesting
                 .runToolRegistryIntrinsics()
         },
+        TestFlow(
+            "tool-exposure-inspection",
+            tags: [
+                "agentic-execution",
+                "tools",
+                "exposure",
+                "inspection",
+            ]
+        ) {
+            try await AgenticExecutionFlowTesting
+                .runToolExposureInspection()
+        },
     ]
 }
