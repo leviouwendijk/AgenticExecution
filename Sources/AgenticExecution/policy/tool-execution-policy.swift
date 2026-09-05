@@ -5,7 +5,7 @@ public struct ToolExecutionPolicy: Sendable, Codable, Hashable {
     public var limits: ExecutionLimits
 
     public init(
-        autonomyMode: AutonomyMode = .review_privileged,
+        autonomyMode: AutonomyMode = .auto_observe,
         limits: ExecutionLimits = .unlimited
     ) {
         self.autonomyMode = autonomyMode
