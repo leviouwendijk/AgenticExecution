@@ -14,6 +14,18 @@ enum AgenticExecutionFlowSuite: TestFlowRegistry {
 
     static let flows: [TestFlow] = [
         TestFlow(
+            "tool-catalog",
+            tags: [
+                "agentic-execution",
+                "tools",
+                "catalog",
+                "exposure",
+            ]
+        ) {
+            try await AgenticExecutionFlowTesting
+                .runToolCatalog()
+        },
+        TestFlow(
             "tool-plan-run-retry-resume",
             tags: [
                 "agentic-execution",

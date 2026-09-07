@@ -1,13 +1,17 @@
 public struct AgentToolRegistration: Sendable {
+    public let collection: AgentToolCollectionMetadata?
+
     private let applyHandler: @Sendable (
         inout ToolRegistry
     ) throws -> Void
 
     public init(
+        collection: AgentToolCollectionMetadata? = nil,
         apply: @escaping @Sendable (
             inout ToolRegistry
         ) throws -> Void
     ) {
+        self.collection = collection
         self.applyHandler = apply
     }
 
@@ -16,6 +20,15 @@ public struct AgentToolRegistration: Sendable {
     ) throws {
         try applyHandler(
             &registry
+        )
+    }
+
+    public func assigning(
+        collection: AgentToolCollectionMetadata
+    ) -> Self {
+        .init(
+            collection: collection,
+            apply: applyHandler
         )
     }
 }
