@@ -1,5 +1,5 @@
 import Schema
-import SchemaMacros
+import Macros
 
 /// Inspect the captured declared Agentic tool registry without changing model-visible tool exposure.
 @JSONSchema
