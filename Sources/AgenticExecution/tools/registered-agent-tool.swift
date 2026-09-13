@@ -1,4 +1,5 @@
 import Agentic
+import AgenticRecovery
 import Foundation
 import Primitives
 
@@ -281,6 +282,26 @@ public enum RegisteredAgentToolError:
     }
 }
 
+private func recoveryIncidentCapturingEvidence(
+    _ incident: Recovery.Incident,
+    error: any Error
+) -> Recovery.Incident {
+    guard incident.report == nil else {
+        return incident
+    }
+
+    return Recovery.Incident(
+        capturing: error,
+        kind: incident.kind,
+        stage: incident.stage,
+        effectState: incident.effectState,
+        retrySafety: incident.retrySafety,
+        scope: incident.scope,
+        message: incident.message,
+        metadata: incident.metadata
+    )
+}
+
 private func phasedToolCallError<T: AgentTool>(
     tool: T,
     call: AgentToolCall,
@@ -291,13 +312,19 @@ private func phasedToolCallError<T: AgentTool>(
         return error
     }
 
-    let incident = (
+    let classifiedIncident = (
         tool as? any AgentToolRecoveryClassifying
     )?.incident(
         for: error,
         phase: phase,
         call: call
     )
+    let incident = classifiedIncident.map {
+        recoveryIncidentCapturingEvidence(
+            $0,
+            error: error
+        )
+    }
 
     return AgentToolCallError(
         tool: tool.identifier,

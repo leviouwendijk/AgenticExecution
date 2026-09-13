@@ -1,5 +1,6 @@
 import Agentic
 import AgenticExecution
+import AgenticRecovery
 import Foundation
 import Primitives
 import Schema
@@ -63,6 +64,8 @@ extension AgenticExecutionFlowTesting {
         try await proveEncodePhase()
         try await proveReportedFailureResult()
         try await proveToolPlanFailurePersistence()
+        let recoveryEvidence =
+            try await proveRecoveryErrorEvidence()
 
         return [
             .field(
@@ -78,6 +81,10 @@ extension AgenticExecutionFlowTesting {
             .field(
                 "tool-plan-persistence",
                 "typed"
+            ),
+            .field(
+                "recovery-error-evidence",
+                String(recoveryEvidence)
             ),
         ]
     }
@@ -266,6 +273,104 @@ private func proveToolPlanFailurePersistence() async throws {
     )
 }
 
+private func proveRecoveryErrorEvidence() async throws -> Bool {
+    let tool = RecoveryFailureTool()
+    let call = try phaseCall(
+        id: "recovery-error-evidence-call",
+        name: tool.identifier.rawValue
+    )
+    let registry = try ToolRegistry {
+        tool
+    }
+    let failure = try await capturedFailure {
+        _ = try await registry.execute(
+            call,
+            context: .init()
+        )
+    }
+
+    try Expect.equal(
+        failure.phase,
+        .call,
+        "classified recovery failure retains its concrete tool phase"
+    )
+    try Expect.equal(
+        failure.message,
+        "fixture call failure",
+        "tool failure envelope retains the underlying presentation message"
+    )
+
+    let incident = try Expect.notNil(
+        failure.incident,
+        "classified tool failure retains a normalized recovery incident"
+    )
+
+    try Expect.equal(
+        incident.kind,
+        .transport_transient,
+        "tool classifier retains normalized recovery kind"
+    )
+    try Expect.equal(
+        incident.stage,
+        .execution,
+        "tool classifier retains normalized recovery stage"
+    )
+    try Expect.equal(
+        incident.effectState,
+        .none,
+        "tool classifier retains effect-state semantics"
+    )
+    try Expect.equal(
+        incident.retrySafety,
+        .safe,
+        "tool classifier retains retry-safety semantics"
+    )
+    try Expect.equal(
+        incident.scope.kind,
+        .tool,
+        "tool classifier retains tool recovery scope"
+    )
+    try Expect.equal(
+        incident.message,
+        "fixture classified tool failure",
+        "operational recovery message remains distinct from the underlying diagnostic message"
+    )
+
+    let report = try Expect.notNil(
+        incident.report,
+        "registered tool boundary attaches structured error evidence to the classified incident"
+    )
+
+    try Expect.equal(
+        report.presentation.message,
+        failure.message,
+        "captured ErrorReport retains the underlying failure presentation"
+    )
+
+    let persisted = try JSONDecoder().decode(
+        AgentToolCallFailure.self,
+        from: JSONEncoder().encode(
+            failure
+        )
+    )
+    let persistedIncident = try Expect.notNil(
+        persisted.incident,
+        "AgentToolCallFailure Codable round trip retains the recovery incident"
+    )
+
+    try Expect.equal(
+        persisted,
+        failure,
+        "AgentToolCallFailure Codable round trip preserves structured recovery evidence"
+    )
+    _ = try Expect.notNil(
+        persistedIncident.report,
+        "AgentToolCallFailure persistence retains the incident ErrorReport"
+    )
+
+    return true
+}
+
 private func capturedFailure(
     _ operation: () async throws -> Void
 ) async throws -> AgentToolCallFailure {
@@ -369,6 +474,72 @@ private struct PhaseFailureTool: AgentTool {
         return .init(
             status: "passed",
             summary: output.value
+        )
+    }
+}
+
+private struct RecoveryFailureTool:
+    AgentTool,
+    AgentToolRecoveryClassifying
+{
+    typealias Input = PhaseFailureInput
+    typealias Output = PhaseFailureOutput
+
+    let identifier: AgentToolIdentifier =
+        "recovery_failure_evidence"
+
+    var description: String {
+        "Exercises structured recovery evidence for a typed tool failure."
+    }
+
+    var risk: ActionRisk {
+        .observe
+    }
+
+    func preflight(
+        _ input: Input,
+        context _: AgentToolExecutionContext
+    ) async throws -> ToolPreflight {
+        ToolPreflight(
+            toolName: name,
+            risk: risk,
+            summary: "recovery-evidence:\(input.value)"
+        )
+    }
+
+    func call(
+        _ input: Input,
+        context _: AgentToolExecutionContext
+    ) async throws -> Output {
+        _ = input
+        throw PhaseFailureProbeError.call
+    }
+
+    func incident(
+        for error: any Error,
+        phase: AgentToolCallPhase,
+        call: AgentToolCall
+    ) -> Recovery.Incident? {
+        guard
+            phase == .call,
+            error is PhaseFailureProbeError
+        else {
+            return nil
+        }
+
+        return Recovery.Incident(
+            kind: .transport_transient,
+            stage: .execution,
+            effectState: .none,
+            retrySafety: .safe,
+            scope: .init(
+                kind: .tool,
+                identifier: identifier.rawValue
+            ),
+            message: "fixture classified tool failure",
+            metadata: [
+                "tool_call_id": call.id,
+            ]
         )
     }
 }
