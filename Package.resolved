@@ -1,5 +1,5 @@
 {
-  "originHash" : "226d5a1dbb94d1ad55b0f568cd4efc4a1fe3c0e6ab6b26fc40cd560c38a6b8e3",
+  "originHash" : "62e55ec87d60f8be16f6ed5f87e5ae1b2c9a7717b8cf45d0b09c06aeb149bc22",
   "pins" : [
     {
       "identity" : "agentic",
@@ -8,6 +8,15 @@
       "state" : {
         "branch" : "master",
         "revision" : "6586bbc2fb0b842c82cbf2b189dad6bca2ab0fdc"
+      }
+    },
+    {
+      "identity" : "agenticrecovery",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/leviouwendijk/AgenticRecovery.git",
+      "state" : {
+        "branch" : "master",
+        "revision" : "ef6301b4026afccc1b2557bbdb300dde869a5a26"
       }
     },
     {

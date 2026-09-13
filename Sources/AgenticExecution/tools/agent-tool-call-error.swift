@@ -1,4 +1,5 @@
 import Agentic
+import AgenticRecovery
 import Foundation
 
 /// Stable execution phase for one registered AgentTool call.
@@ -33,19 +34,22 @@ public struct AgentToolCallFailure:
     public let phase: AgentToolCallPhase
     public let message: String
     public let errorType: String
+    public let incident: Recovery.Incident?
 
     public init(
         tool: AgentToolIdentifier,
         toolCallID: String,
         phase: AgentToolCallPhase,
         message: String,
-        errorType: String
+        errorType: String,
+        incident: Recovery.Incident? = nil
     ) {
         self.tool = tool
         self.toolCallID = toolCallID
         self.phase = phase
         self.message = message
         self.errorType = errorType
+        self.incident = incident
     }
 }
 
@@ -67,7 +71,8 @@ public struct AgentToolCallError:
         tool: AgentToolIdentifier,
         toolCallID: String,
         phase: AgentToolCallPhase,
-        underlying error: any Error
+        underlying error: any Error,
+        incident: Recovery.Incident? = nil
     ) {
         self.init(
             failure: .init(
@@ -81,7 +86,8 @@ public struct AgentToolCallError:
                     reflecting: type(
                         of: error
                     )
-                )
+                ),
+                incident: incident
             )
         )
     }

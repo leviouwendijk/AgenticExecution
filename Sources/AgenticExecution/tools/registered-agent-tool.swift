@@ -47,7 +47,7 @@ public struct RegisteredAgentTool: Sendable {
                 )
             } catch {
                 throw phasedToolCallError(
-                    tool: tool.identifier,
+                    tool: tool,
                     call: call,
                     phase: .decode,
                     error: error
@@ -65,7 +65,7 @@ public struct RegisteredAgentTool: Sendable {
                 )
             } catch {
                 throw phasedToolCallError(
-                    tool: tool.identifier,
+                    tool: tool,
                     call: call,
                     phase: .decode,
                     error: error
@@ -79,7 +79,7 @@ public struct RegisteredAgentTool: Sendable {
                 )
             } catch {
                 throw phasedToolCallError(
-                    tool: tool.identifier,
+                    tool: tool,
                     call: call,
                     phase: .preflight,
                     error: error
@@ -97,7 +97,7 @@ public struct RegisteredAgentTool: Sendable {
                 )
             } catch {
                 throw phasedToolCallError(
-                    tool: tool.identifier,
+                    tool: tool,
                     call: call,
                     phase: .decode,
                     error: error
@@ -118,7 +118,7 @@ public struct RegisteredAgentTool: Sendable {
                 isError = true
             } catch {
                 throw phasedToolCallError(
-                    tool: tool.identifier,
+                    tool: tool,
                     call: call,
                     phase: .call,
                     error: error
@@ -135,7 +135,7 @@ public struct RegisteredAgentTool: Sendable {
                 )
             } catch {
                 throw phasedToolCallError(
-                    tool: tool.identifier,
+                    tool: tool,
                     call: call,
                     phase: .process,
                     error: error
@@ -150,7 +150,7 @@ public struct RegisteredAgentTool: Sendable {
                 )
             } catch {
                 throw phasedToolCallError(
-                    tool: tool.identifier,
+                    tool: tool,
                     call: call,
                     phase: .encode,
                     error: error
@@ -281,8 +281,8 @@ public enum RegisteredAgentToolError:
     }
 }
 
-private func phasedToolCallError(
-    tool: AgentToolIdentifier,
+private func phasedToolCallError<T: AgentTool>(
+    tool: T,
     call: AgentToolCall,
     phase: AgentToolCallPhase,
     error: any Error
@@ -291,11 +291,20 @@ private func phasedToolCallError(
         return error
     }
 
+    let incident = (
+        tool as? any AgentToolRecoveryClassifying
+    )?.incident(
+        for: error,
+        phase: phase,
+        call: call
+    )
+
     return AgentToolCallError(
-        tool: tool,
+        tool: tool.identifier,
         toolCallID: call.id,
         phase: phase,
-        underlying: error
+        underlying: error,
+        incident: incident
     )
 }
 
