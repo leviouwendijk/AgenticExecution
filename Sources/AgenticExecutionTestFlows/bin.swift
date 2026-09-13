@@ -227,6 +227,19 @@ enum AgenticExecutionFlowSuite: TestFlowRegistry {
                 .runToolCallFailureEnvelope()
         },
         TestFlow(
+            "tool-reconciliation",
+            tags: [
+                "agentic-execution",
+                "tools",
+                "recovery",
+                "reconciliation",
+                "mutation",
+            ]
+        ) {
+            try await AgenticExecutionFlowTesting
+                .runToolReconciliation()
+        },
+        TestFlow(
             "tool-policy-directives",
             tags: [
                 "agentic-execution",

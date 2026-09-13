@@ -32,4 +32,26 @@ public extension ToolRegistry {
             context: context
         )
     }
+
+    func reconcile(
+        _ call: AgentToolCall,
+        failure: AgentToolCallFailure,
+        context: AgentToolExecutionContext
+    ) async throws -> RegisteredAgentTool.Reconciliation? {
+        guard let registered =
+            registeredTool(
+                named: call.name
+            )
+        else {
+            throw ToolRegistryExecutionError.missingTool(
+                call.name
+            )
+        }
+
+        return try await registered.reconcile(
+            call,
+            failure: failure,
+            context: context
+        )
+    }
 }

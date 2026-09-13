@@ -335,6 +335,16 @@ private func proveRecoveryErrorEvidence() async throws -> Bool {
         "fixture classified tool failure",
         "operational recovery message remains distinct from the underlying diagnostic message"
     )
+    try Expect.equal(
+        incident.metadata["tool_call_id"],
+        call.id,
+        "AgentTool classification receives canonical call context"
+    )
+    try Expect.equal(
+        incident.metadata["input"],
+        "fixture",
+        "AgentTool classification receives typed input after decode"
+    )
 
     let report = try Expect.notNil(
         incident.report,
@@ -478,10 +488,7 @@ private struct PhaseFailureTool: AgentTool {
     }
 }
 
-private struct RecoveryFailureTool:
-    AgentTool,
-    AgentToolRecoveryClassifying
-{
+private struct RecoveryFailureTool: AgentTool {
     typealias Input = PhaseFailureInput
     typealias Output = PhaseFailureOutput
 
@@ -515,14 +522,16 @@ private struct RecoveryFailureTool:
         throw PhaseFailureProbeError.call
     }
 
-    func incident(
-        for error: any Error,
+    func classify(
+        _ error: any Error,
         phase: AgentToolCallPhase,
-        call: AgentToolCall
+        input: Input?,
+        context: AgentToolExecutionContext
     ) -> Recovery.Incident? {
         guard
             phase == .call,
-            error is PhaseFailureProbeError
+            error is PhaseFailureProbeError,
+            input?.value == "fixture"
         else {
             return nil
         }
@@ -538,7 +547,8 @@ private struct RecoveryFailureTool:
             ),
             message: "fixture classified tool failure",
             metadata: [
-                "tool_call_id": call.id,
+                "tool_call_id": context.toolCallID ?? "missing",
+                "input": input?.value ?? "missing",
             ]
         )
     }

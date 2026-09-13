@@ -1,4 +1,5 @@
 import Agentic
+import AgenticRecovery
 import AgenticWorkspace
 import Primitives
 import Schema
@@ -33,6 +34,19 @@ public protocol AgentTool<Input, Output>: Sendable {
         _ input: Input,
         context: AgentToolExecutionContext
     ) async throws -> Output
+
+    func classify(
+        _ error: any Error,
+        phase: AgentToolCallPhase,
+        input: Input?,
+        context: AgentToolExecutionContext
+    ) -> Recovery.Incident?
+
+    func reconcile(
+        _ input: Input,
+        after failure: AgentToolCallFailure,
+        context: AgentToolExecutionContext
+    ) async throws -> AgentToolReconciliation<Output>?
 
     func process(
         _ output: Output,
@@ -86,6 +100,30 @@ public extension AgentTool {
             summary: description,
             sideEffects: risk.defaultSideEffects
         )
+    }
+
+    func classify(
+        _ error: any Error,
+        phase: AgentToolCallPhase,
+        input: Input?,
+        context: AgentToolExecutionContext
+    ) -> Recovery.Incident? {
+        _ = error
+        _ = phase
+        _ = input
+        _ = context
+        return nil
+    }
+
+    func reconcile(
+        _ input: Input,
+        after failure: AgentToolCallFailure,
+        context: AgentToolExecutionContext
+    ) async throws -> AgentToolReconciliation<Output>? {
+        _ = input
+        _ = failure
+        _ = context
+        return nil
     }
 
     func process(

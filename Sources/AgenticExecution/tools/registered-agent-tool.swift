@@ -8,6 +8,43 @@ import Primitives
 /// Registration captures every operation that requires the concrete Self/Input/Output
 /// types. The registry never needs to reopen an AgentTool existential afterward.
 public struct RegisteredAgentTool: Sendable {
+    public enum Reconciliation: Sendable {
+        case applied(AgentToolResult)
+        case applied_without_output
+        case not_applied
+        case unknown
+
+        public var state: Recovery.State {
+            switch self {
+            case .applied,
+                 .applied_without_output:
+                .init(
+                    reconciled: .applied
+                )
+
+            case .not_applied:
+                .init(
+                    reconciled: .not_applied
+                )
+
+            case .unknown:
+                .init(
+                    reconciled: .unknown
+                )
+            }
+        }
+    }
+
+    private enum ReconciliationExecution: Sendable {
+        case applied(
+            output: JSONValue,
+            projection: AgentToolResultProjection?
+        )
+        case applied_without_output
+        case not_applied
+        case unknown
+    }
+
     public let capability: AgentToolCapability
 
     private let parseModelInputHandler:
@@ -28,6 +65,13 @@ public struct RegisteredAgentTool: Sendable {
             projection: AgentToolResultProjection?,
             isError: Bool
         )
+
+    private let reconcileHandler:
+        @Sendable (
+            AgentToolCall,
+            AgentToolCallFailure,
+            AgentToolExecutionContext
+        ) async throws -> ReconciliationExecution?
 
     public init<T>(
         _ tool: T
@@ -69,6 +113,7 @@ public struct RegisteredAgentTool: Sendable {
                     tool: tool,
                     call: call,
                     phase: .decode,
+                    context: context,
                     error: error
                 )
             }
@@ -83,6 +128,8 @@ public struct RegisteredAgentTool: Sendable {
                     tool: tool,
                     call: call,
                     phase: .preflight,
+                    input: input,
+                    context: context,
                     error: error
                 )
             }
@@ -101,6 +148,7 @@ public struct RegisteredAgentTool: Sendable {
                     tool: tool,
                     call: call,
                     phase: .decode,
+                    context: context,
                     error: error
                 )
             }
@@ -122,6 +170,8 @@ public struct RegisteredAgentTool: Sendable {
                     tool: tool,
                     call: call,
                     phase: .call,
+                    input: input,
+                    context: context,
                     error: error
                 )
             }
@@ -139,6 +189,8 @@ public struct RegisteredAgentTool: Sendable {
                     tool: tool,
                     call: call,
                     phase: .process,
+                    input: input,
+                    context: context,
                     error: error
                 )
             }
@@ -154,6 +206,8 @@ public struct RegisteredAgentTool: Sendable {
                     tool: tool,
                     call: call,
                     phase: .encode,
+                    input: input,
+                    context: context,
                     error: error
                 )
             }
@@ -163,6 +217,86 @@ public struct RegisteredAgentTool: Sendable {
                 projection: projection,
                 isError: isError
             )
+        }
+
+        self.reconcileHandler = { call, failure, context in
+            let input: T.Input
+
+            do {
+                input = try JSONToolBridge.decode(
+                    T.Input.self,
+                    from: call.input
+                )
+            } catch {
+                throw phasedToolCallError(
+                    tool: tool,
+                    call: call,
+                    phase: .decode,
+                    context: context,
+                    error: error
+                )
+            }
+
+            guard let reconciliation = try await tool.reconcile(
+                input,
+                after: failure,
+                context: context
+            ) else {
+                return nil
+            }
+
+            switch reconciliation {
+            case .applied(let output):
+                let projection: AgentToolResultProjection?
+
+                do {
+                    projection = try tool.process(
+                        output,
+                        input: input,
+                        context: context
+                    )
+                } catch {
+                    throw phasedToolCallError(
+                        tool: tool,
+                        call: call,
+                        phase: .process,
+                        input: input,
+                        context: context,
+                        error: error
+                    )
+                }
+
+                let encodedOutput: JSONValue
+
+                do {
+                    encodedOutput = try JSONToolBridge.encode(
+                        output
+                    )
+                } catch {
+                    throw phasedToolCallError(
+                        tool: tool,
+                        call: call,
+                        phase: .encode,
+                        input: input,
+                        context: context,
+                        error: error
+                    )
+                }
+
+                return .applied(
+                    output: encodedOutput,
+                    projection: projection
+                )
+
+            case .applied_without_output:
+                return .applied_without_output
+
+            case .not_applied:
+                return .not_applied
+
+            case .unknown:
+                return .unknown
+            }
         }
     }
 
@@ -239,6 +373,79 @@ public struct RegisteredAgentTool: Sendable {
             isError: execution.isError
         )
     }
+
+    public func reconcile(
+        _ call: AgentToolCall,
+        failure: AgentToolCallFailure,
+        context: AgentToolExecutionContext
+    ) async throws -> Reconciliation? {
+        guard
+            failure.tool == capability.definition.identifier,
+            failure.toolCallID == call.id,
+            failure.phase == .call
+        else {
+            throw RegisteredAgentToolError.invalidFailure(
+                tool: capability.definition.name,
+                callID: call.id
+            )
+        }
+
+        let recorder = AgentToolObservationRecorder()
+        let upstreamSink = context.observationSink
+        let observationSink = AgentToolObservationSink { observation in
+            await recorder.append(
+                observation
+            )
+            await upstreamSink?.observe(
+                observation
+            )
+        }
+        let executionContext = context
+            .withToolCallID(
+                call.id
+            )
+            .withObservationSink(
+                observationSink
+            )
+
+        guard let reconciliation = try await reconcileHandler(
+            call,
+            failure,
+            executionContext
+        ) else {
+            return nil
+        }
+
+        switch reconciliation {
+        case .applied(let output, let projection):
+            let processing = AgentToolResultProcessing(
+                projection: projection,
+                observations: await recorder.snapshot()
+            )
+
+            return .applied(
+                AgentToolResult(
+                    toolCallID: call.id,
+                    name: capability.definition.name,
+                    output: output,
+                    processing:
+                        processing.isEmpty
+                            ? nil
+                            : processing,
+                    isError: false
+                )
+            )
+
+        case .applied_without_output:
+            return .applied_without_output
+
+        case .not_applied:
+            return .not_applied
+
+        case .unknown:
+            return .unknown
+        }
+    }
 }
 
 /// A model call that has resolved to one exact registered tool and crossed that
@@ -268,6 +475,11 @@ public enum RegisteredAgentToolError:
         reason: String
     )
 
+    case invalidFailure(
+        tool: String,
+        callID: String
+    )
+
     public var errorDescription: String? {
         switch self {
         case .hostOnly(let tool):
@@ -278,6 +490,12 @@ public enum RegisteredAgentToolError:
             let reason
         ):
             "Cannot parse model input for registered tool '\(tool)': \(reason)"
+
+        case .invalidFailure(
+            let tool,
+            let callID
+        ):
+            "Cannot reconcile tool '\(tool)' for call '\(callID)' from an unrelated or non-call failure."
         }
     }
 }
@@ -306,18 +524,21 @@ private func phasedToolCallError<T: AgentTool>(
     tool: T,
     call: AgentToolCall,
     phase: AgentToolCallPhase,
+    input: T.Input? = nil,
+    context: AgentToolExecutionContext = .init(),
     error: any Error
 ) -> AgentToolCallError {
     if let error = error as? AgentToolCallError {
         return error
     }
 
-    let classifiedIncident = (
-        tool as? any AgentToolRecoveryClassifying
-    )?.incident(
-        for: error,
+    let classifiedIncident = tool.classify(
+        error,
         phase: phase,
-        call: call
+        input: input,
+        context: context.withToolCallID(
+            call.id
+        )
     )
     let incident = classifiedIncident.map {
         recoveryIncidentCapturingEvidence(
