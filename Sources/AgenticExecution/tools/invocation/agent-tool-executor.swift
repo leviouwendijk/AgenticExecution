@@ -45,6 +45,9 @@ struct AgentToolExecutor {
                         for: call,
                         error: error
                     ),
+                    failure:
+                        (error as? AgentToolCallError)?
+                            .failure,
                     recovery: propagatedRecovery
                 )
             }

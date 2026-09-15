@@ -148,7 +148,9 @@ private extension AgentToolPlanExecutor {
             path: path,
             call: call,
             outcome: outcome,
-            invocation: invocation
+            invocation: invocation,
+            toolFailure: invocation.execution?.failure,
+            errorDescription: invocation.execution?.failure?.message
         )
 
         let branches = await branchRecords(
@@ -413,11 +415,11 @@ private extension AgentToolPlanExecutor {
     ) -> AgentToolPlanOutcome {
         switch invocation.decision {
         case .approved:
-            guard let result = invocation.toolResult else {
+            guard let execution = invocation.execution else {
                 return .failed
             }
 
-            return result.isError
+            return execution.result.isError
                 ? .failed
                 : .succeeded
 

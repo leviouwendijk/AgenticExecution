@@ -76,7 +76,7 @@ public struct ToolInvoker: Sendable {
                 return .init(
                     review: review,
                     decision: .needshuman,
-                    toolResult: nil
+                    execution: nil
                 )
             }
 
@@ -92,19 +92,20 @@ public struct ToolInvoker: Sendable {
             return .init(
                 review: review,
                 decision: decision,
-                toolResult: nil
+                execution: nil
             )
         }
 
-        let toolResult = try await registry.execute(
+        let toolExecution = try await executeApproved(
             call,
+            preflight: review.preflight,
             context: context
         )
 
         return .init(
             review: review,
             decision: decision,
-            toolResult: toolResult
+            execution: toolExecution
         )
     }
 

@@ -110,20 +110,20 @@ public extension ToolInvocation {
     struct Result: Sendable, Codable, Hashable {
         public let review: Review
         public let decision: ApprovalDecision
-        public let toolResult: AgentToolResult?
+        public let execution: AgentToolExecutionResult?
 
         public init(
             review: Review,
             decision: ApprovalDecision,
-            toolResult: AgentToolResult?
+            execution: AgentToolExecutionResult?
         ) {
             self.review = review
             self.decision = decision
-            self.toolResult = toolResult
+            self.execution = execution
         }
 
         public var executed: Bool {
-            toolResult != nil
+            execution != nil
         }
     }
 }

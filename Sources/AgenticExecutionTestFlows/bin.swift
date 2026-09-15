@@ -253,6 +253,34 @@ enum AgenticExecutionFlowSuite: TestFlowRegistry {
                 .runToolMechanicalMutationRecovery()
         },
         TestFlow(
+            "tool-invocation-recovery-evidence",
+            tags: [
+                "agentic-execution",
+                "tools",
+                "invocation",
+                "recovery",
+                "evidence",
+                "persistence",
+            ]
+        ) {
+            try await AgenticExecutionFlowTesting
+                .runToolInvocationRecoveryEvidence()
+        },
+        TestFlow(
+            "tool-plan-recovery-evidence",
+            tags: [
+                "agentic-execution",
+                "tools",
+                "tool-plan",
+                "recovery",
+                "evidence",
+                "persistence",
+            ]
+        ) {
+            try await AgenticExecutionFlowTesting
+                .runToolPlanRecoveryEvidence()
+        },
+        TestFlow(
             "tool-reconciliation",
             tags: [
                 "agentic-execution",

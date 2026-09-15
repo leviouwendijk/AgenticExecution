@@ -53,7 +53,7 @@ extension AgenticExecutionFlowTesting {
             "resolver observer sees approved invocation"
         )
         try Expect.equal(
-            observedExecution.toolResult?.toolCallID,
+            observedExecution.execution?.result.toolCallID,
             "resolver-observer-observe-call",
             "resolver observer sees the exact executed result"
         )
@@ -108,7 +108,7 @@ extension AgenticExecutionFlowTesting {
             "resolver observer sees unresolved human review"
         )
         try Expect.equal(
-            observedReview.toolResult,
+            observedReview.execution,
             nil,
             "unresolved human review remains unexecuted"
         )

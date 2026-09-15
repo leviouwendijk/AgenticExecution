@@ -182,12 +182,175 @@ extension AgenticExecutionFlowTesting {
             ),
         ]
     }
+
+    static func runToolInvocationRecoveryEvidence() async throws -> [TestFlowDiagnostic] {
+        let fixture = try mechanicalRecoveryFixture(
+            scenario: .observe_retry
+        )
+        let invocation = try await fixture.invoker.invoke(
+            fixture.call
+        )
+        let execution = try Expect.notNil(
+            invocation.execution,
+            "approved invocation preserves canonical execution evidence"
+        )
+
+        try Expect.equal(
+            invocation.decision,
+            .approved,
+            "recovered ordinary invocation remains approved"
+        )
+        try Expect.equal(
+            execution.result.isError,
+            false,
+            "recovered ordinary invocation exposes successful operation result"
+        )
+        try Expect.equal(
+            execution.recovery?.outcome,
+            .recovered,
+            "ordinary invocation retains mechanical recovery evidence"
+        )
+        try Expect.equal(
+            execution.recovery?.attempts.count,
+            1,
+            "ordinary invocation retains exact recovery attempt count"
+        )
+        try Expect.equal(
+            invocation.executed,
+            true,
+            "canonical execution evidence defines invocation execution state"
+        )
+
+        let persisted = try JSONToolBridge.decode(
+            ToolInvocation.Result.self,
+            from: try JSONToolBridge.encode(
+                invocation
+            )
+        )
+
+        try Expect.equal(
+            persisted,
+            invocation,
+            "canonical invocation execution evidence survives persistence round-trip"
+        )
+
+        return [
+            .field(
+                "decision",
+                invocation.decision.rawValue
+            ),
+            .field(
+                "recovery",
+                execution.recovery?.outcome.rawValue ?? "missing"
+            ),
+            .field(
+                "attempts",
+                "\(execution.recovery?.attempts.count ?? 0)"
+            ),
+        ]
+    }
+
+    static func runToolPlanRecoveryEvidence() async throws -> [TestFlowDiagnostic] {
+        let fixture = try mechanicalRecoveryFixture(
+            scenario: .observe_retry
+        )
+        let result = try await fixture.invoker.invoke(
+            AgentToolPlan(
+                id: "mechanical-recovery-plan-evidence",
+                root: .call(
+                    fixture.call
+                )
+            )
+        )
+        let record = try Expect.notNil(
+            result.records.first,
+            "ToolPlan records the recovered call"
+        )
+        let execution = try Expect.notNil(
+            record.invocation?.execution,
+            "ToolPlan record preserves canonical execution evidence"
+        )
+
+        try Expect.equal(
+            result.outcome,
+            .succeeded,
+            "mechanically recovered ToolPlan call remains semantically successful"
+        )
+        try Expect.equal(
+            execution.result.isError,
+            false,
+            "ToolPlan canonical execution preserves successful operation result"
+        )
+        try Expect.equal(
+            execution.recovery?.outcome,
+            .recovered,
+            "ToolPlan record preserves mechanical recovery outcome"
+        )
+        try Expect.equal(
+            execution.recovery?.attempts.map(\.action),
+            [
+                .retry_same_operation,
+            ],
+            "ToolPlan record preserves exact mechanical recovery actions"
+        )
+
+        let persisted = try JSONToolBridge.decode(
+            AgentToolPlanResult.self,
+            from: try JSONToolBridge.encode(
+                result
+            )
+        )
+        let persistedExecution = try Expect.notNil(
+            persisted.records.first?.invocation?.execution,
+            "persisted ToolPlan retains canonical execution evidence"
+        )
+
+        try Expect.equal(
+            persistedExecution.recovery,
+            execution.recovery,
+            "ToolPlan persistence retains exact recovery record"
+        )
+
+        return [
+            .field(
+                "outcome",
+                result.outcome.rawValue
+            ),
+            .field(
+                "recovery",
+                execution.recovery?.outcome.rawValue ?? "missing"
+            ),
+            .field(
+                "persisted",
+                String(persistedExecution.recovery != nil)
+            ),
+        ]
+    }
 }
 
 private extension AgenticExecutionFlowTesting {
     static func mechanicalRecoveryExecution(
         scenario: MechanicalRecoveryScenario
     ) async throws -> AgentToolExecutionResult {
+        let fixture = try mechanicalRecoveryFixture(
+            scenario: scenario
+        )
+        let review = try await fixture.invoker.review(
+            fixture.call
+        )
+
+        return try await fixture.invoker.executeApproved(
+            fixture.call,
+            preflight: review.preflight
+        )
+    }
+
+    static func mechanicalRecoveryFixture(
+        scenario: MechanicalRecoveryScenario
+    ) throws -> (
+        invoker: ToolInvoker,
+        call: AgentToolCall
+    ) {
         let probe = MechanicalRecoveryProbe()
         let tool = MechanicalRecoveryTool(
             probe: probe
@@ -210,13 +373,10 @@ private extension AgenticExecutionFlowTesting {
                 )
             )
         )
-        let review = try await invoker.review(
-            call
-        )
 
-        return try await invoker.executeApproved(
-            call,
-            preflight: review.preflight
+        return (
+            invoker,
+            call
         )
     }
 

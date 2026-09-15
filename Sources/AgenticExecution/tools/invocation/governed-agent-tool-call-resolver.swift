@@ -1,4 +1,5 @@
 import Agentic
+import AgenticRecovery
 import Primitives
 
 public enum AgentToolCallResolutionError:
@@ -28,6 +29,7 @@ public struct GovernedAgentToolCallResolver:
         registry: ToolRegistry,
         exposure: AgentToolExposure,
         policy: ToolExecutionPolicy,
+        recovery: Recovery.Policy? = nil,
         context: AgentToolExecutionContext = .init(),
         approvalHandler: (any ToolApprovalHandler)? = nil,
         resolutionObserver:
@@ -37,7 +39,8 @@ public struct GovernedAgentToolCallResolver:
         self.exposure = exposure
         self.invoker = ToolInvoker(
             registry: registry,
-            policy: policy
+            policy: policy,
+            recovery: recovery
         )
         self.context = context
         self.approvalHandler = approvalHandler
@@ -64,7 +67,7 @@ public struct GovernedAgentToolCallResolver:
             invocation
         )
 
-        if let result = invocation.toolResult {
+        if let result = invocation.execution?.result {
             return result
         }
 

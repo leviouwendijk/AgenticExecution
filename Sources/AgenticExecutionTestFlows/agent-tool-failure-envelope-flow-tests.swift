@@ -260,7 +260,16 @@ private func proveToolPlanFailurePersistence() async throws {
         record.toolFailure,
         "ToolPlan record persists the typed tool failure"
     )
+    let executionFailure = try Expect.notNil(
+        record.invocation?.execution?.failure,
+        "ToolPlan invocation persists the canonical typed tool failure"
+    )
 
+    try Expect.equal(
+        executionFailure,
+        failure,
+        "ToolPlan projection preserves the exact canonical execution failure"
+    )
     try Expect.equal(
         failure.phase,
         .call,
