@@ -1,16 +1,20 @@
 import Agentic
+import AgenticRecovery
 import AgenticWorkspace
 
 public struct ToolInvoker: Sendable {
     public let registry: ToolRegistry
     public let policy: ToolExecutionPolicy
+    public let recovery: Recovery.Policy?
 
     public init(
         registry: ToolRegistry,
-        policy: ToolExecutionPolicy
+        policy: ToolExecutionPolicy,
+        recovery: Recovery.Policy? = nil
     ) {
         self.registry = registry
         self.policy = policy
+        self.recovery = recovery
     }
 
     public func review(
