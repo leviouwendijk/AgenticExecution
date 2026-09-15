@@ -227,6 +227,32 @@ enum AgenticExecutionFlowSuite: TestFlowRegistry {
                 .runToolCallFailureEnvelope()
         },
         TestFlow(
+            "tool-mechanical-observe-retry",
+            tags: [
+                "agentic-execution",
+                "tools",
+                "recovery",
+                "retry",
+                "observe",
+            ]
+        ) {
+            try await AgenticExecutionFlowTesting
+                .runToolMechanicalObserveRetry()
+        },
+        TestFlow(
+            "tool-mechanical-mutation-recovery",
+            tags: [
+                "agentic-execution",
+                "tools",
+                "recovery",
+                "reconciliation",
+                "mutation",
+            ]
+        ) {
+            try await AgenticExecutionFlowTesting
+                .runToolMechanicalMutationRecovery()
+        },
+        TestFlow(
             "tool-reconciliation",
             tags: [
                 "agentic-execution",
