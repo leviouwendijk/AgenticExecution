@@ -14,6 +14,20 @@ enum AgenticExecutionFlowSuite: TestFlowRegistry {
 
     static let flows: [TestFlow] = [
         TestFlow(
+            "prepared-operation-registry",
+            tags: [
+                "agentic-execution",
+                "prepared-operation",
+                "registry",
+                "persistence",
+                "typing",
+                "version",
+            ]
+        ) {
+            try await AgenticExecutionFlowTesting
+                .runPreparedOperationRegistry()
+        },
+        TestFlow(
             "prepared-operation-envelope",
             tags: [
                 "agentic-execution",
