@@ -51,6 +51,10 @@ let package = Package(
             branch: "master"
         ),
         .package(
+            url: "https://github.com/leviouwendijk/Version.git",
+            branch: "master"
+        ),
+        .package(
             url: "https://github.com/leviouwendijk/TestFlows.git",
             branch: "master"
         ),
@@ -74,6 +78,10 @@ let package = Package(
                 .product(
                     name: "Primitives",
                     package: "Primitives"
+                ),
+                .product(
+                    name: "Version",
+                    package: "Version"
                 ),
                 .product(
                     name: "Schema",
@@ -108,6 +116,10 @@ let package = Package(
                 .product(
                     name: "Primitives",
                     package: "Primitives"
+                ),
+                .product(
+                    name: "Version",
+                    package: "Version"
                 ),
                 .product(
                     name: "Schema",
