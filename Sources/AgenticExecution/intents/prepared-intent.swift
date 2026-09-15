@@ -1,14 +1,13 @@
 import Agentic
 import Foundation
-import Primitives
 
 public struct PreparedIntent: Sendable, Codable, Hashable, Identifiable {
     public let id: PreparedIntentIdentifier
     public var sessionID: String?
-    public var actionType: String
+    public var operation: PreparedOperation.Envelope
     public var status: PreparedIntentStatus
     public var reviewPayload: PreparedIntentReviewPayload
-    public var executionToolName: String?
+    public var expiresAt: Date?
     public var idempotencyKey: String?
     public var createdAt: Date
     public var updatedAt: Date
@@ -21,10 +20,10 @@ public struct PreparedIntent: Sendable, Codable, Hashable, Identifiable {
     public init(
         id: PreparedIntentIdentifier = .init(UUID().uuidString),
         sessionID: String? = nil,
-        actionType: String,
+        operation: PreparedOperation.Envelope,
         status: PreparedIntentStatus = .pending_review,
         reviewPayload: PreparedIntentReviewPayload,
-        executionToolName: String? = nil,
+        expiresAt: Date? = nil,
         idempotencyKey: String? = nil,
         createdAt: Date = Date(),
         updatedAt: Date = Date(),
@@ -36,10 +35,10 @@ public struct PreparedIntent: Sendable, Codable, Hashable, Identifiable {
     ) {
         self.id = id
         self.sessionID = sessionID
-        self.actionType = actionType
+        self.operation = operation
         self.status = status
         self.reviewPayload = reviewPayload
-        self.executionToolName = executionToolName
+        self.expiresAt = expiresAt
         self.idempotencyKey = idempotencyKey
         self.createdAt = createdAt
         self.updatedAt = updatedAt
@@ -55,7 +54,7 @@ public extension PreparedIntent {
     func isExpired(
         at date: Date = Date()
     ) -> Bool {
-        guard let expiresAt = reviewPayload.expiresAt else {
+        guard let expiresAt else {
             return false
         }
 
@@ -70,7 +69,8 @@ public extension PreparedIntent {
         executionRecord?.completedAt
     }
 
-    var executionResult: JSONValue? {
+    var executionResult: PreparedOperation.ResultEnvelope? {
         executionRecord?.result
     }
 }
+

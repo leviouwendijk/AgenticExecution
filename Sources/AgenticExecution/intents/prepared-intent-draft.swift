@@ -2,25 +2,26 @@ import Foundation
 
 public struct PreparedIntentDraft: Sendable, Codable, Hashable {
     public var sessionID: String?
-    public var actionType: String
+    public var operation: PreparedOperation.Envelope
     public var reviewPayload: PreparedIntentReviewPayload
-    public var executionToolName: String?
+    public var expiresAt: Date?
     public var idempotencyKey: String?
     public var metadata: [String: String]
 
     public init(
         sessionID: String? = nil,
-        actionType: String,
+        operation: PreparedOperation.Envelope,
         reviewPayload: PreparedIntentReviewPayload,
-        executionToolName: String? = nil,
+        expiresAt: Date? = nil,
         idempotencyKey: String? = nil,
         metadata: [String: String] = [:]
     ) {
         self.sessionID = sessionID
-        self.actionType = actionType
+        self.operation = operation
         self.reviewPayload = reviewPayload
-        self.executionToolName = executionToolName
+        self.expiresAt = expiresAt
         self.idempotencyKey = idempotencyKey
         self.metadata = metadata
     }
 }
+

@@ -1,6 +1,5 @@
 import Agentic
 import Foundation
-import Primitives
 
 public actor PreparedIntentManager {
     public let store: any PreparedIntentStore
@@ -14,10 +13,6 @@ public actor PreparedIntentManager {
     public func create(
         _ draft: PreparedIntentDraft
     ) async throws -> PreparedIntent {
-        let actionType = try normalizedRequired(
-            draft.actionType,
-            error: .emptyActionType
-        )
         let title = try normalizedRequired(
             draft.reviewPayload.title,
             error: .emptyTitle
@@ -30,19 +25,14 @@ public actor PreparedIntentManager {
         var payload = draft.reviewPayload
         payload.title = title
         payload.summary = summary
-        payload.actionType = normalized(
-            payload.actionType
-        ) ?? actionType
 
         let intent = PreparedIntent(
             sessionID: normalized(
                 draft.sessionID
             ),
-            actionType: actionType,
+            operation: draft.operation,
             reviewPayload: payload,
-            executionToolName: normalized(
-                draft.executionToolName
-            ),
+            expiresAt: draft.expiresAt,
             idempotencyKey: normalized(
                 draft.idempotencyKey
             ),
@@ -73,14 +63,11 @@ public actor PreparedIntentManager {
     public func list(
         statuses: [PreparedIntentStatus] = [],
         sessionID: String? = nil,
-        actionType: String? = nil,
+        operationIdentifier: PreparedOperation.Identifier? = nil,
         includeExpired: Bool = false
     ) async throws -> [PreparedIntent] {
         let sessionID = normalized(
             sessionID
-        )
-        let actionType = normalized(
-            actionType
         )
 
         return try await store.list().filter { intent in
@@ -100,8 +87,8 @@ public actor PreparedIntentManager {
                 return false
             }
 
-            if let actionType,
-               intent.actionType != actionType {
+            if let operationIdentifier,
+               intent.operation.schema.identifier != operationIdentifier {
                 return false
             }
 
@@ -126,10 +113,15 @@ public actor PreparedIntentManager {
             )
         }
 
-        if intent.isExpired(),
+        let reviewedAt = Date()
+
+        if intent.isExpired(
+            at: reviewedAt
+        ),
            decision == .approve {
             intent.status = .expired
-            intent.reviewedAt = Date()
+            intent.updatedAt = reviewedAt
+            intent.reviewedAt = reviewedAt
             intent.reviewedBy = normalized(
                 reviewer
             )
@@ -147,7 +139,8 @@ public actor PreparedIntentManager {
         }
 
         intent.status = decision.resolvedStatus
-        intent.reviewedAt = Date()
+        intent.updatedAt = reviewedAt
+        intent.reviewedAt = reviewedAt
         intent.reviewedBy = normalized(
             reviewer
         )
@@ -174,6 +167,7 @@ public actor PreparedIntentManager {
             at: now
         ) {
             intent.status = .expired
+            intent.updatedAt = now
 
             try await store.save(
                 intent
@@ -211,7 +205,7 @@ public actor PreparedIntentManager {
 
     public func markExecuted(
         id: PreparedIntentIdentifier,
-        result: JSONValue? = nil
+        result: PreparedOperation.ResultEnvelope? = nil
     ) async throws -> PreparedIntent {
         try await markExecutionSucceeded(
             id: id,
@@ -223,7 +217,7 @@ public actor PreparedIntentManager {
     public func markExecutionSucceeded(
         id: PreparedIntentIdentifier,
         summary: String,
-        result: JSONValue? = nil,
+        result: PreparedOperation.ResultEnvelope? = nil,
         metadata: [String: String] = [:]
     ) async throws -> PreparedIntent {
         let intent = try await executableIntent(
@@ -240,7 +234,7 @@ public actor PreparedIntentManager {
             id: id,
             record: .init(
                 intentID: id,
-                executionToolName: intent.executionToolName,
+                operation: intent.operation.schema,
                 status: .succeeded,
                 summary: summary,
                 startedAt: now,
@@ -255,7 +249,7 @@ public actor PreparedIntentManager {
         id: PreparedIntentIdentifier,
         summary: String,
         errorMessage: String? = nil,
-        result: JSONValue? = nil,
+        result: PreparedOperation.ResultEnvelope? = nil,
         metadata: [String: String] = [:]
     ) async throws -> PreparedIntent {
         let intent = try await executableIntent(
@@ -272,7 +266,7 @@ public actor PreparedIntentManager {
             id: id,
             record: .init(
                 intentID: id,
-                executionToolName: intent.executionToolName,
+                operation: intent.operation.schema,
                 status: .failed,
                 summary: summary,
                 startedAt: now,
@@ -308,8 +302,26 @@ private extension PreparedIntentManager {
             )
         }
 
+        let expectedSchema = intent.operation.schema
+
+        guard record.operation == expectedSchema else {
+            throw PreparedIntentError.executionRecordOperationMismatch(
+                expected: expectedSchema,
+                actual: record.operation
+            )
+        }
+
+        if let result = record.result,
+           result.schema != expectedSchema {
+            throw PreparedIntentError.executionResultSchemaMismatch(
+                expected: expectedSchema,
+                actual: result.schema
+            )
+        }
+
         var intent = intent
         intent.status = record.status.resolvedIntentStatus
+        intent.updatedAt = record.completedAt
         intent.executionRecord = record
 
         try await store.save(
@@ -348,3 +360,4 @@ private extension PreparedIntentManager {
         return trimmed
     }
 }
+
