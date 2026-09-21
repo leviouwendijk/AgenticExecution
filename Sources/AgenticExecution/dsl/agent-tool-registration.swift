@@ -1,3 +1,5 @@
+import Agentic
+
 public struct AgentToolRegistration: Sendable {
     public let collection: AgentToolCollectionMetadata?
 
@@ -35,21 +37,15 @@ public struct AgentToolRegistration: Sendable {
 
 public extension AgentToolRegistration {
     static func tool<T>(
-        _ tool: T
-    ) -> Self where T: AgentTool {
+        _ tool: T,
+        modelContract: AgentToolModelContract? = nil,
+        execution: AgentToolExecutionContract = .fixed
+    ) -> Self where T: Tool {
         .init { registry in
             try registry.register(
-                tool
-            )
-        }
-    }
-
-    static func toolSet(
-        _ toolSet: any AgentToolSet
-    ) -> Self {
-        .init { registry in
-            try registry.register(
-                toolSet
+                tool,
+                modelContract: modelContract,
+                execution: execution
             )
         }
     }
@@ -77,17 +73,9 @@ public enum AgentToolBuilder {
 
     public static func buildExpression<T>(
         _ expression: T
-    ) -> [AgentToolRegistration] where T: AgentTool {
+    ) -> [AgentToolRegistration] where T: Tool {
         [
             .tool(expression)
-        ]
-    }
-
-    public static func buildExpression(
-        _ expression: any AgentToolSet
-    ) -> [AgentToolRegistration] {
-        [
-            .toolSet(expression)
         ]
     }
 

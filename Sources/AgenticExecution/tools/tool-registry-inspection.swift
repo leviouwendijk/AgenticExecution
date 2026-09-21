@@ -21,7 +21,7 @@ public struct AgentToolRegistryInspection:
 public struct AgentToolRegistryInspectionEntry:
     Sendable
 {
-    public let identifier: AgentToolIdentifier
+    public let identifier: ToolIdentifier
     public let description: String
     public let risk: ActionRisk
     public let isModelFacing: Bool
@@ -30,7 +30,7 @@ public struct AgentToolRegistryInspectionEntry:
     public let semanticInputSchema: JSONSchema?
 
     public init(
-        identifier: AgentToolIdentifier,
+        identifier: ToolIdentifier,
         description: String,
         risk: ActionRisk,
         isModelFacing: Bool,
@@ -79,7 +79,7 @@ public extension ToolRegistry {
 
     /// Inspect one exact registered tool identifier.
     func inspect(
-        identifiedBy identifier: AgentToolIdentifier
+        identifiedBy identifier: ToolIdentifier
     ) -> AgentToolRegistryInspectionEntry? {
         registeredTool(
             identifiedBy: identifier

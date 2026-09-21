@@ -1,3 +1,4 @@
+import Agentic
 import Foundation
 
 public struct PathExecutionLimits: Sendable, Codable, Hashable {
@@ -314,23 +315,23 @@ private extension ExecutionLimits {
         for preflight: ToolPreflight
     ) -> Bool {
         if let maxTargetPathCount,
-           preflight.targetPaths.count > maxTargetPathCount {
+           preflight.access.targets.count > maxTargetPathCount {
             return true
         }
 
         if let maxWriteCount,
-           preflight.estimatedWriteCount > maxWriteCount {
+           preflight.estimates.write.count > maxWriteCount {
             return true
         }
 
         if let maxBytes,
-           let maximumEstimatedByteCount = preflight.maximumEstimatedByteCount,
+           let maximumEstimatedByteCount = preflight.estimates.maximumByteCount,
            maximumEstimatedByteCount > maxBytes {
             return true
         }
 
         if let maxRuntimeSeconds,
-           let estimatedRuntimeSeconds = preflight.estimatedRuntimeSeconds,
+           let estimatedRuntimeSeconds = preflight.estimates.runtime,
            estimatedRuntimeSeconds > maxRuntimeSeconds {
             return true
         }
@@ -342,34 +343,34 @@ private extension ExecutionLimits {
         for preflight: ToolPreflight
     ) -> Bool {
         if let maxTargetPathCount = paths.maxTargetPathCount,
-           preflight.targetPaths.count > maxTargetPathCount {
+           preflight.access.targets.count > maxTargetPathCount {
             return true
         }
 
         if let maxScanEntries = paths.maxScanEntries,
-           let estimatedScanEntries = preflight.estimatedScanEntries,
+           let estimatedScanEntries = preflight.estimates.scan.entries,
            estimatedScanEntries > maxScanEntries {
             return true
         }
 
         if let maxScanDepth = paths.maxScanDepth,
-           let estimatedScanDepth = preflight.estimatedScanDepth,
+           let estimatedScanDepth = preflight.estimates.scan.depth,
            estimatedScanDepth > maxScanDepth {
             return true
         }
 
         if paths.allowHidden == false,
-           preflight.includesHiddenPaths {
+           preflight.access.includesHidden {
             return true
         }
 
         if paths.allowSymlinks == false,
-           preflight.followsSymlinks {
+           preflight.access.followsSymlinks {
             return true
         }
 
         if let maxRootsPerToolCall = paths.maxRootsPerToolCall,
-           preflight.rootIDs.count > maxRootsPerToolCall {
+           preflight.access.roots.count > maxRootsPerToolCall {
             return true
         }
 
@@ -380,25 +381,25 @@ private extension ExecutionLimits {
         for preflight: ToolPreflight
     ) -> Bool {
         if let maxReadBytes = reads.maxReadBytes,
-           let estimatedReadBytes = preflight.estimatedReadBytes,
+           let estimatedReadBytes = preflight.estimates.read.bytes,
            estimatedReadBytes > maxReadBytes {
             return true
         }
 
         if let maxReadLines = reads.maxReadLines,
-           let estimatedReadLines = preflight.estimatedReadLines,
+           let estimatedReadLines = preflight.estimates.read.lines,
            estimatedReadLines > maxReadLines {
             return true
         }
 
         if let maxFilesPerRead = reads.maxFilesPerRead,
-           let estimatedFileReadCount = preflight.estimatedFileReadCount,
+           let estimatedFileReadCount = preflight.estimates.read.files,
            estimatedFileReadCount > maxFilesPerRead {
             return true
         }
 
         if let maxToolOutputBytes = reads.maxToolOutputBytes,
-           let estimatedToolOutputBytes = preflight.estimatedToolOutputBytes,
+           let estimatedToolOutputBytes = preflight.estimates.outputBytes,
            estimatedToolOutputBytes > maxToolOutputBytes {
             return true
         }
@@ -410,25 +411,25 @@ private extension ExecutionLimits {
         for preflight: ToolPreflight
     ) -> Bool {
         if let maxWriteCount = writes.maxWriteCount,
-           preflight.estimatedWriteCount > maxWriteCount {
+           preflight.estimates.write.count > maxWriteCount {
             return true
         }
 
         if let maxWriteBytes = writes.maxWriteBytes,
-           let estimatedWriteBytes = preflight.estimatedWriteBytes,
+           let estimatedWriteBytes = preflight.estimates.write.bytes,
            estimatedWriteBytes > maxWriteBytes {
             return true
         }
 
         if let maxChangedLineCount = writes.maxChangedLineCount,
-           let estimatedChangedLineCount = preflight.estimatedChangedLineCount,
+           let estimatedChangedLineCount = preflight.estimates.write.changedLines,
            estimatedChangedLineCount > maxChangedLineCount {
             return true
         }
 
         if writes.requirePreviewForWrites == true,
-           preflight.estimatedWriteCount > 0,
-           !preflight.isPreview {
+           preflight.estimates.write.count > 0,
+           preflight.preview.isEmpty {
             return true
         }
 
@@ -439,31 +440,31 @@ private extension ExecutionLimits {
         for preflight: ToolPreflight
     ) -> Bool {
         if let maxContextBytes = context.maxContextBytes,
-           let estimatedContextBytes = preflight.estimatedContextBytes,
+           let estimatedContextBytes = preflight.estimates.context.bytes,
            estimatedContextBytes > maxContextBytes {
             return true
         }
 
         if let maxContextTokens = context.maxContextTokens,
-           let estimatedContextTokens = preflight.estimatedContextTokens,
+           let estimatedContextTokens = preflight.estimates.context.tokens,
            estimatedContextTokens > maxContextTokens {
             return true
         }
 
         if let maxFiles = context.maxFiles,
-           let estimatedContextFiles = preflight.estimatedContextFiles,
+           let estimatedContextFiles = preflight.estimates.context.files,
            estimatedContextFiles > maxFiles {
             return true
         }
 
         if let maxLinesPerFile = context.maxLinesPerFile,
-           let estimatedReadLines = preflight.estimatedReadLines,
+           let estimatedReadLines = preflight.estimates.read.lines,
            estimatedReadLines > maxLinesPerFile {
             return true
         }
 
         if let maxLargestSourceTokens = context.maxLargestSourceTokens,
-           let estimatedLargestSourceTokens = preflight.estimatedLargestSourceTokens,
+           let estimatedLargestSourceTokens = preflight.estimates.context.largestSourceTokens,
            estimatedLargestSourceTokens > maxLargestSourceTokens {
             return true
         }
@@ -475,7 +476,7 @@ private extension ExecutionLimits {
         for preflight: ToolPreflight
     ) -> Bool {
         if let maxRuntimeSeconds = runtime.maxRuntimeSeconds,
-           let estimatedRuntimeSeconds = preflight.estimatedRuntimeSeconds,
+           let estimatedRuntimeSeconds = preflight.estimates.runtime,
            estimatedRuntimeSeconds > maxRuntimeSeconds {
             return true
         }

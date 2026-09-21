@@ -1,9 +1,9 @@
 import Agentic
 import AgenticExecution
-import AgenticWorkspace
 import Primitives
 import Schema
 import TestFlows
+import Workspace
 
 extension AgenticExecutionFlowTesting {
     static func runToolCallResolverObserver()
@@ -173,20 +173,45 @@ private struct ToolCallResolverObserverInput:
     }
 }
 
-private struct ToolCallResolverObserverTool:
-    AgentTool
+private protocol ToolCallResolverObserverIdentity {
+    static var definition: ToolDefinition { get }
+}
+
+private enum ResolverObserverObserveIdentity:
+    ToolCallResolverObserverIdentity
 {
+    static let definition = ToolDefinition(
+        identifier: "resolver_observer_observe",
+        purpose: "Observe resolver observer fixture.",
+        risk: .observe
+    )
+}
+
+private enum ResolverObserverMutateIdentity:
+    ToolCallResolverObserverIdentity
+{
+    static let definition = ToolDefinition(
+        identifier: "resolver_observer_mutate",
+        purpose: "Mutate resolver observer fixture.",
+        risk: .boundedmutate
+    )
+}
+
+private struct ToolCallResolverObserverTool<
+    Identity: ToolCallResolverObserverIdentity
+>: Tool {
     typealias Input = ToolCallResolverObserverInput
     typealias Output = ToolCallResolverObserverInput
 
-    let identifier: AgentToolIdentifier
-    let description: String
-    let risk: ActionRisk
+    static var definition: ToolDefinition {
+        Identity.definition
+    }
+
     let probe: ToolCallResolverObserverProbe
 
     func call(
         _ input: Input,
-        context _: AgentToolExecutionContext
+        workspace _: WorkspaceContext?
     ) async throws -> Output {
         await probe.recordInvocation()
         return input
@@ -205,18 +230,16 @@ private func toolCallResolverObserverRegistry(
     var registry = ToolRegistry()
 
     try registry.register(
-        ToolCallResolverObserverTool(
-            identifier: "resolver_observer_observe",
-            description: "Observe resolver observer fixture.",
-            risk: .observe,
+        ToolCallResolverObserverTool<
+            ResolverObserverObserveIdentity
+        >(
             probe: probe
         )
     )
     try registry.register(
-        ToolCallResolverObserverTool(
-            identifier: "resolver_observer_mutate",
-            description: "Mutate resolver observer fixture.",
-            risk: .boundedmutate,
+        ToolCallResolverObserverTool<
+            ResolverObserverMutateIdentity
+        >(
             probe: probe
         )
     )
@@ -227,10 +250,12 @@ private func toolCallResolverObserverRegistry(
 private func toolCallResolverObserverCall(
     id: String,
     name: String
-) throws -> AgentToolCall {
-    AgentToolCall(
+) throws -> ToolCall {
+    ToolCall(
         id: id,
-        name: name,
+        tool: ToolIdentifier(
+            rawValue: name
+        ),
         input: try JSONToolBridge.encode(
             ToolCallResolverObserverInput()
         )

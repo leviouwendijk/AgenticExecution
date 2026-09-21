@@ -1,63 +1,26 @@
 import Agentic
-import AgenticRecovery
-import AgenticWorkspace
 import Primitives
 import Schema
 
-/// Strongly typed author-facing contract for one Agentic tool.
-///
-/// Concrete tools stay in their semantic Input/Output domain. JSONValue only
-/// appears after registration at provider, transcript, checkpoint, and registry
-/// execution boundaries.
-public protocol AgentTool<Input, Output>: Sendable {
-    associatedtype Input:
-        Decodable &
-        Sendable &
-        JSONSchemaProviding
+// Agentic.Tool is the canonical authored tool contract.
+//
+// AgenticExecution adds registration/type-erasure/runtime behavior around Tool;
+// it must not define a second authored tool protocol.
+public extension Tool {
+    var identifier: ToolIdentifier {
+        Self.definition.identifier
+    }
 
-    associatedtype Output:
-        Encodable &
-        Sendable
-
-    var identifier: AgentToolIdentifier { get }
-    var description: String { get }
-    var risk: ActionRisk { get }
-    var modelContract: AgentToolModelContract { get }
-    var execution: AgentToolExecutionContract { get }
-
-    func preflight(
-        _ input: Input,
-        context: AgentToolExecutionContext
-    ) async throws -> ToolPreflight
-
-    func call(
-        _ input: Input,
-        context: AgentToolExecutionContext
-    ) async throws -> Output
-
-    func classify(
-        _ error: any Error,
-        phase: AgentToolCallPhase,
-        input: Input?,
-        context: AgentToolExecutionContext
-    ) -> Recovery.Incident?
-
-    func reconcile(
-        _ input: Input,
-        after failure: AgentToolCallFailure,
-        context: AgentToolExecutionContext
-    ) async throws -> AgentToolReconciliation<Output>?
-
-    func process(
-        _ output: Output,
-        input: Input,
-        context: AgentToolExecutionContext
-    ) throws -> AgentToolResultProjection?
-}
-
-public extension AgentTool {
     var name: String {
         identifier.rawValue
+    }
+
+    var description: String {
+        Self.definition.purpose
+    }
+
+    var risk: ActionRisk {
+        Self.definition.risk
     }
 
     var semanticInputSchema: JSONSchema {
@@ -68,83 +31,25 @@ public extension AgentTool {
         semanticInputSchema.jsonvalue
     }
 
-    var modelContract: AgentToolModelContract {
-        .modelFacing(
-            inputSchema: semanticInputSchema
-        )
-    }
-
-    var execution: AgentToolExecutionContract {
-        .fixed
-    }
-
-    var definition: AgentToolDefinition {
+    var descriptor: ToolDescriptor {
         .init(
-            identifier: identifier,
-            description: description,
+            identifier: Self.definition.identifier,
+            description: Self.definition.purpose,
             inputSchema: inputSchema,
-            risk: risk
+            risk: Self.definition.risk
         )
-    }
-
-    func preflight(
-        _ input: Input,
-        context: AgentToolExecutionContext
-    ) async throws -> ToolPreflight {
-        _ = input
-
-        return ToolPreflight(
-            toolName: name,
-            risk: risk,
-            workspaceRoot: context.workspace?.rootURL.path,
-            summary: description,
-            sideEffects: risk.defaultSideEffects
-        )
-    }
-
-    func classify(
-        _ error: any Error,
-        phase: AgentToolCallPhase,
-        input: Input?,
-        context: AgentToolExecutionContext
-    ) -> Recovery.Incident? {
-        _ = error
-        _ = phase
-        _ = input
-        _ = context
-        return nil
-    }
-
-    func reconcile(
-        _ input: Input,
-        after failure: AgentToolCallFailure,
-        context: AgentToolExecutionContext
-    ) async throws -> AgentToolReconciliation<Output>? {
-        _ = input
-        _ = failure
-        _ = context
-        return nil
-    }
-
-    func process(
-        _ output: Output,
-        input: Input,
-        context: AgentToolExecutionContext
-    ) -> AgentToolResultProjection? {
-        _ = output
-        _ = input
-        _ = context
-        return nil
     }
 }
 
-public extension AgentToolReference {
+public extension ToolReference {
     static func tool<T>(
         _ tool: T,
         owner: String? = nil
-    ) -> Self where T: AgentTool {
-        .init(
-            identifier: tool.identifier,
+    ) -> Self where T: Tool {
+        _ = tool
+
+        return .init(
+            identifier: T.definition.identifier,
             owner: owner
         )
     }

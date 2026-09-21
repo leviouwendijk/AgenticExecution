@@ -1,5 +1,6 @@
 import Agentic
 import Foundation
+import Workspace
 
 public enum ToolRegistryExecutionError: Error, Sendable, LocalizedError {
     case missingTool(String)
@@ -14,44 +15,44 @@ public enum ToolRegistryExecutionError: Error, Sendable, LocalizedError {
 
 public extension ToolRegistry {
     func execute(
-        _ call: AgentToolCall,
-        context: AgentToolExecutionContext
-    ) async throws -> AgentToolResult {
+        _ call: ToolCall,
+        workspace: WorkspaceContext? = nil
+    ) async throws -> AgentToolExecutionResult {
         guard let registered =
             registeredTool(
-                named: call.name
+                identifiedBy: call.tool
             )
         else {
             throw ToolRegistryExecutionError.missingTool(
-                call.name
+                call.tool.rawValue
             )
         }
 
         return try await registered.execute(
             call,
-            context: context
+            workspace: workspace
         )
     }
 
     func reconcile(
-        _ call: AgentToolCall,
-        failure: AgentToolCallFailure,
-        context: AgentToolExecutionContext
+        _ call: ToolCall,
+        failure: ToolCall.Failure,
+        workspace: WorkspaceContext? = nil
     ) async throws -> RegisteredAgentTool.Reconciliation? {
         guard let registered =
             registeredTool(
-                named: call.name
+                identifiedBy: call.tool
             )
         else {
             throw ToolRegistryExecutionError.missingTool(
-                call.name
+                call.tool.rawValue
             )
         }
 
         return try await registered.reconcile(
             call,
             failure: failure,
-            context: context
+            workspace: workspace
         )
     }
 }

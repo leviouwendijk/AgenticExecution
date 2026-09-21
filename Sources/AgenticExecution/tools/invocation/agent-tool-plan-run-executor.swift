@@ -1,5 +1,6 @@
 import Agentic
 import Foundation
+import Workspace
 
 public enum AgentToolPlanRunError:
     Error,
@@ -24,13 +25,13 @@ public enum AgentToolPlanRunError:
             return "AgentToolPlanRun must be paused before execution policy resume can be applied."
 
         case .suspensionAlreadyResolved:
-            return "The suspended AgentToolPlan node is already resolved and is awaiting an explicit continuation decision."
+            return "The suspended ToolPlan node is already resolved and is awaiting an explicit continuation decision."
 
         case .suspensionNotResolved:
-            return "The suspended AgentToolPlan node must be retried successfully or explicitly skipped before its parent can resume."
+            return "The suspended ToolPlan node must be retried successfully or explicitly skipped before its parent can resume."
 
         case .missingSuspendedCall(let callID):
-            return "Suspended tool call '\(callID)' is no longer present in the immutable parent AgentToolPlan."
+            return "Suspended tool call '\(callID)' is no longer present in the immutable parent ToolPlan."
 
         case .missingPausedCall(let callID):
             return "Paused tool call '\(callID)' is no longer present at the recorded serial ToolPlan boundary."
@@ -60,15 +61,17 @@ public struct AgentToolPlanRunExecutor:
     }
 
     public func start(
-        _ plan: AgentToolPlan,
+        _ plan: ToolPlan,
         runID: String = UUID().uuidString,
         relationship: AgentToolPlanRunRelationship = .root,
-        context: AgentToolExecutionContext = .init(),
+        workspace: WorkspaceContext? = nil,
+        guidelineRelations: [AgentGuidelineRelation] = [],
         approvalHandler: (any ToolApprovalHandler)? = nil
     ) async throws -> AgentToolPlanRun {
         let result = try await planExecutor.execute(
             plan,
-            context: context,
+            workspace: workspace,
+            guidelineRelations: guidelineRelations,
             approvalHandler: approvalHandler
         )
 
@@ -101,7 +104,8 @@ public struct AgentToolPlanRunExecutor:
     /// the interruption but does not automatically resume the parent.
     public func retry(
         _ run: AgentToolPlanRun,
-        context: AgentToolExecutionContext = .init(),
+        workspace: WorkspaceContext? = nil,
+        guidelineRelations: [AgentGuidelineRelation] = [],
         approvalHandler: (any ToolApprovalHandler)? = nil
     ) async throws -> AgentToolPlanRun {
         let suspension = try unresolvedSuspension(
@@ -117,15 +121,16 @@ public struct AgentToolPlanRunExecutor:
         }
 
         let attemptNumber = run.attempts.count + 1
-        let retryPlan = AgentToolPlan(
+        let retryPlan = try ToolPlan(
             id: "\(run.plan.id).retry.\(attemptNumber)",
             root: node,
-            guidelineRelations: run.plan.guidelineRelations
+            guidelines: run.plan.guidelines
         )
 
         let rawResult = try await planExecutor.execute(
             retryPlan,
-            context: context,
+            workspace: workspace,
+            guidelineRelations: guidelineRelations,
             approvalHandler: approvalHandler
         )
         let result = remap(
@@ -238,7 +243,8 @@ public struct AgentToolPlanRunExecutor:
     /// rejected until those semantics are explicitly designed.
     public func resume(
         _ run: AgentToolPlanRun,
-        context: AgentToolExecutionContext = .init(),
+        workspace: WorkspaceContext? = nil,
+        guidelineRelations: [AgentGuidelineRelation] = [],
         approvalHandler: (any ToolApprovalHandler)? = nil
     ) async throws -> AgentToolPlanRun {
         guard case .suspended(let suspension) = run.state else {
@@ -253,7 +259,8 @@ public struct AgentToolPlanRunExecutor:
             run,
             afterPath: suspension.path,
             afterCallID: suspension.callID,
-            context: context,
+            workspace: workspace,
+            guidelineRelations: guidelineRelations,
             approvalHandler: approvalHandler
         )
     }
@@ -262,7 +269,8 @@ public struct AgentToolPlanRunExecutor:
         _ run: AgentToolPlanRun,
         afterPath: String,
         afterCallID: String,
-        context: AgentToolExecutionContext,
+        workspace: WorkspaceContext?,
+        guidelineRelations: [AgentGuidelineRelation],
         approvalHandler: (any ToolApprovalHandler)?
     ) async throws -> AgentToolPlanRun {
         guard let continuation = run.plan.root.sequenceContinuation(
@@ -293,7 +301,8 @@ public struct AgentToolPlanRunExecutor:
             continuation,
             plan: run.plan,
             attemptNumber: attemptNumber,
-            context: context,
+            workspace: workspace,
+            guidelineRelations: guidelineRelations,
             approvalHandler: approvalHandler
         )
         let attempt = AgentToolPlanAttempt(
@@ -403,7 +412,7 @@ private extension AgentToolPlanRunExecutor {
     }
 
     func resolvedState(
-        plan: AgentToolPlan,
+        plan: ToolPlan,
         suspension: AgentToolPlanSuspension,
         resolution: AgentToolPlanResolution,
         attemptNumber: Int
@@ -433,9 +442,10 @@ private extension AgentToolPlanRunExecutor {
 
     func executeContinuation(
         _ continuation: [AgentToolPlanContinuationStep],
-        plan: AgentToolPlan,
+        plan: ToolPlan,
         attemptNumber: Int,
-        context: AgentToolExecutionContext,
+        workspace: WorkspaceContext?,
+        guidelineRelations: [AgentGuidelineRelation],
         approvalHandler: (any ToolApprovalHandler)?
     ) async throws -> AgentToolPlanResult {
         var records: [AgentToolPlanRecord] = []
@@ -444,14 +454,15 @@ private extension AgentToolPlanRunExecutor {
             index,
             step
         ) in continuation.enumerated() {
-            let continuationPlan = AgentToolPlan(
+            let continuationPlan = try ToolPlan(
                 id: "\(plan.id).resume.\(attemptNumber).\(index + 1)",
                 root: step.node,
-                guidelineRelations: plan.guidelineRelations
+                guidelines: plan.guidelines
             )
             let rawResult = try await planExecutor.execute(
                 continuationPlan,
-                context: context,
+                workspace: workspace,
+                guidelineRelations: guidelineRelations,
                 approvalHandler: approvalHandler
             )
             let result = remap(
@@ -528,10 +539,10 @@ private struct AgentToolPlanContinuationStep:
     Sendable
 {
     let path: String
-    let node: AgentToolPlanNode
+    let node: ToolPlan.Node
 }
 
-private extension AgentToolPlanNode {
+private extension ToolPlan.Node {
     func node(
         containingCallID callID: String
     ) -> Self? {

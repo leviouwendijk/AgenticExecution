@@ -1,9 +1,9 @@
 import Agentic
 import AgenticExecution
-import AgenticWorkspace
 import Primitives
 import Schema
 import TestFlows
+import Workspace
 
 extension AgenticExecutionFlowTesting {
     static func runToolExposureAll() async throws -> [TestFlowDiagnostic] {
@@ -151,7 +151,7 @@ extension AgenticExecutionFlowTesting {
         try Expect.equal(
             activated,
             [
-                AgentToolIdentifier(
+                ToolIdentifier(
                     "beta_tool"
                 ),
             ],
@@ -182,7 +182,7 @@ extension AgenticExecutionFlowTesting {
         )
 
         try Expect.equal(
-            parsed.call.name,
+            parsed.call.tool.rawValue,
             "beta_tool",
             "newly activated tool becomes model-callable"
         )
@@ -284,38 +284,64 @@ private struct ToolExposureProbeInput:
     }
 }
 
-private struct ToolExposureProbeTool:
-    AgentTool
+private protocol ToolExposureProbeIdentity {
+    static var definition: ToolDefinition { get }
+}
+
+private enum AlphaExposureToolIdentity:
+    ToolExposureProbeIdentity
 {
+    static let definition = ToolDefinition(
+        identifier: "alpha_tool",
+        purpose:
+            "Alpha model-facing exposure fixture.",
+        risk: .observe
+    )
+}
+
+private enum BetaExposureToolIdentity:
+    ToolExposureProbeIdentity
+{
+    static let definition = ToolDefinition(
+        identifier: "beta_tool",
+        purpose:
+            "Beta model-facing exposure fixture.",
+        risk: .observe
+    )
+}
+
+private struct ToolExposureProbeTool<
+    Identity: ToolExposureProbeIdentity
+>: Tool {
     typealias Input = ToolExposureProbeInput
     typealias Output = ToolExposureProbeInput
 
-    let identifier: AgentToolIdentifier
-    let description: String
-    let risk: ActionRisk = .observe
+    static var definition: ToolDefinition {
+        Identity.definition
+    }
 
     func call(
         _ input: Input,
-        context _: AgentToolExecutionContext
+        workspace _: WorkspaceContext?
     ) async throws -> Output {
         input
     }
 }
 
-private struct ToolExposureHostProbeTool:
-    AgentTool
-{
+private struct ToolExposureHostProbeTool: Tool {
     typealias Input = ToolExposureProbeInput
     typealias Output = ToolExposureProbeInput
 
-    let identifier: AgentToolIdentifier = "host_probe"
-    let description = "Trusted host-only exposure fixture."
-    let risk: ActionRisk = .observe
-    let modelContract: AgentToolModelContract = .hostOnly
+    static let definition = ToolDefinition(
+        identifier: "host_probe",
+        purpose:
+            "Trusted host-only exposure fixture.",
+        risk: .observe
+    )
 
     func call(
         _ input: Input,
-        context _: AgentToolExecutionContext
+        workspace _: WorkspaceContext?
     ) async throws -> Output {
         input
     }
@@ -330,20 +356,19 @@ private func toolExposureRegistry() throws -> ToolRegistry {
     var registry = ToolRegistry()
 
     try registry.register(
-        ToolExposureProbeTool(
-            identifier: "alpha_tool",
-            description: "Alpha model-facing exposure fixture."
-        )
+        ToolExposureProbeTool<
+            AlphaExposureToolIdentity
+        >()
     )
     try registry.register(
-        ToolExposureProbeTool(
-            identifier: "beta_tool",
-            description: "Beta model-facing exposure fixture."
-        )
+        ToolExposureProbeTool<
+            BetaExposureToolIdentity
+        >()
     )
 
     try registry.register(
-        ToolExposureHostProbeTool()
+        ToolExposureHostProbeTool(),
+        modelContract: .hostOnly
     )
 
     return registry
@@ -352,10 +377,12 @@ private func toolExposureRegistry() throws -> ToolRegistry {
 private func toolExposureCall(
     id: String,
     name: String
-) throws -> AgentToolCall {
-    AgentToolCall(
+) throws -> ToolCall {
+    ToolCall(
         id: id,
-        name: name,
+        tool: ToolIdentifier(
+            rawValue: name
+        ),
         input: try JSONToolBridge.encode(
             ToolExposureProbeInput()
         )

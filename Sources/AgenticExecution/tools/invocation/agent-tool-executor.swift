@@ -1,29 +1,26 @@
 import Agentic
-import AgenticRecovery
 import Foundation
 import Primitives
+import Workspace
 
 struct AgentToolExecutor {
     let invoker: ToolInvoker
     let recovery: Recovery.Policy?
-    let context: AgentToolExecutionContext
+    let workspace: WorkspaceContext?
 
     func execute(
-        _ call: AgentToolCall,
+        _ call: ToolCall,
         preflight: ToolPreflight
     ) async throws -> AgentToolExecutionResult {
         do {
-            return AgentToolExecutionResult(
-                result: try await invoker.registry.execute(
-                    call,
-                    context: context
-                ),
-                recovery: nil
+            return try await invoker.registry.execute(
+                call,
+                workspace: workspace
             )
         } catch {
             let propagatedRecovery: Recovery.Record?
 
-            if let toolError = error as? AgentToolCallError,
+            if let toolError = error as? ToolCall.Error,
                let incident = toolError.failure.incident
             {
                 propagatedRecovery = Recovery.Record(
@@ -46,7 +43,7 @@ struct AgentToolExecutor {
                         error: error
                     ),
                     failure:
-                        (error as? AgentToolCallError)?
+                        (error as? ToolCall.Error)?
                             .failure,
                     recovery: propagatedRecovery
                 )
@@ -98,7 +95,7 @@ struct AgentToolExecutor {
                         guard let reconciliation = try await invoker.registry.reconcile(
                             call,
                             failure: recovery.failure,
-                            context: context
+                            workspace: workspace
                         ) else {
                             let recoveryError =
                                 AgentToolExecutorError
@@ -137,13 +134,11 @@ struct AgentToolExecutor {
                         recovery.state = state
 
                         switch reconciliation {
-                        case .applied(let result):
-                            return AgentToolExecutionResult(
-                                result: result,
-                                recovery: recovery.record(
-                                    outcome: .recovered
-                                )
+                        case .applied(var result):
+                            result.recovery = recovery.record(
+                                outcome: .recovered
                             )
+                            return result
 
                         case .applied_without_output:
                             let recoveryError =
@@ -219,7 +214,7 @@ struct AgentToolExecutor {
                         do {
                             let refreshed = try await invoker.review(
                                 call,
-                                context: context
+                                workspace: workspace
                             ).preflight
 
                             guard refreshed == preflight else {
@@ -269,9 +264,9 @@ struct AgentToolExecutor {
                     }
 
                     do {
-                        let result = try await invoker.registry.execute(
+                        var result = try await invoker.registry.execute(
                             call,
-                            context: context
+                            workspace: workspace
                         )
                         let state = Recovery.State(
                             reconciled:
@@ -290,12 +285,10 @@ struct AgentToolExecutor {
                             )
                         )
 
-                        return AgentToolExecutionResult(
-                            result: result,
-                            recovery: recovery.record(
-                                outcome: .recovered
-                            )
+                        result.recovery = recovery.record(
+                            outcome: .recovered
                         )
+                        return result
                     } catch {
                         let accepted = recovery.absorb(
                             error
@@ -397,21 +390,21 @@ struct AgentToolExecutor {
     }
 
     private func makeErrorResult(
-        for call: AgentToolCall,
+        for call: ToolCall,
         error: any Error
-    ) throws -> AgentToolResult {
+    ) throws -> ToolResult {
         let payload = AgentToolExecutorErrorPayload(
             kind: "tool_error",
             toolCallID: call.id,
-            toolName: call.name,
+            toolName: call.tool.rawValue,
             message: localizedDescription(
                 for: error
             )
         )
 
-        return AgentToolResult(
+        return ToolResult(
             toolCallID: call.id,
-            name: call.name,
+            tool: call.tool,
             output: try JSONToolBridge.encode(
                 payload
             ),
@@ -472,7 +465,7 @@ private enum AgentToolExecutorError:
 private struct AgentToolExecutorActiveRecovery {
     let incident: Recovery.Incident
     let plan: Recovery.Plan
-    var failure: AgentToolCallFailure
+    var failure: ToolCall.Failure
     var attempts: [Recovery.Attempt]
     var state: Recovery.State
     var stepIndex: Int
@@ -483,7 +476,7 @@ private struct AgentToolExecutorActiveRecovery {
         policy: Recovery.Policy?
     ) {
         guard
-            let error = error as? AgentToolCallError,
+            let error = error as? ToolCall.Error,
             error.failure.phase == .call,
             let incident = error.failure.incident,
             let plan = policy?.plan(
@@ -529,7 +522,7 @@ private struct AgentToolExecutorActiveRecovery {
         _ error: any Error
     ) -> Bool {
         guard
-            let error = error as? AgentToolCallError,
+            let error = error as? ToolCall.Error,
             error.failure.phase == .call,
             let incident = error.failure.incident,
             incident.kind == self.incident.kind,
@@ -591,14 +584,14 @@ private struct AgentToolExecutorErrorPayload:
 
 public extension ToolInvoker {
     func executeApproved(
-        _ call: AgentToolCall,
+        _ call: ToolCall,
         preflight: ToolPreflight,
-        context: AgentToolExecutionContext = .init()
+        workspace: WorkspaceContext? = nil
     ) async throws -> AgentToolExecutionResult {
         try await AgentToolExecutor(
             invoker: self,
             recovery: recovery,
-            context: context
+            workspace: workspace
         ).execute(
             call,
             preflight: preflight

@@ -157,7 +157,7 @@ public struct AgentToolPlanRun:
     Identifiable
 {
     public let id: String
-    public let plan: AgentToolPlan
+    public let plan: ToolPlan
     public let relationship: AgentToolPlanRunRelationship
     public let attempts: [AgentToolPlanAttempt]
     public let resolutions: [AgentToolPlanResolution]
@@ -166,7 +166,7 @@ public struct AgentToolPlanRun:
 
     public init(
         id: String,
-        plan: AgentToolPlan,
+        plan: ToolPlan,
         relationship: AgentToolPlanRunRelationship,
         attempts: [AgentToolPlanAttempt],
         resolutions: [AgentToolPlanResolution] = [],

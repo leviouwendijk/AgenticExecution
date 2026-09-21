@@ -4,6 +4,7 @@ import Primitives
 import Schema
 import TestFlows
 import Foundation
+import Workspace
 
 enum AgenticExecutionFlowTesting {
     static func runToolPlanExecutionPolicyModel() throws -> [TestFlowDiagnostic] {
@@ -101,43 +102,51 @@ enum AgenticExecutionFlowTesting {
 
     static func runToolPlanSingleStepResume() async throws -> [TestFlowDiagnostic] {
         let fixture = try makeFixture()
-        let first = AgentToolCall(
+        let first = ToolCall(
             id: "first",
-            name: "tool_plan_run_probe",
+            tool: ToolIdentifier(
+                rawValue: "tool_plan_run_probe"
+            ),
             input: try JSONToolBridge.encode(
                 RunProbeInput(
                     marker: "first"
                 )
             )
         )
-        let second = AgentToolCall(
+        let second = ToolCall(
             id: "second",
-            name: "tool_plan_run_probe",
+            tool: ToolIdentifier(
+                rawValue: "tool_plan_run_probe"
+            ),
             input: try JSONToolBridge.encode(
                 RunProbeInput(
                     marker: "second"
                 )
             )
         )
-        let third = AgentToolCall(
+        let third = ToolCall(
             id: "third",
-            name: "tool_plan_run_probe",
+            tool: ToolIdentifier(
+                rawValue: "tool_plan_run_probe"
+            ),
             input: try JSONToolBridge.encode(
                 RunProbeInput(
                     marker: "third"
                 )
             )
         )
-        let fourth = AgentToolCall(
+        let fourth = ToolCall(
             id: "fourth",
-            name: "tool_plan_run_probe",
+            tool: ToolIdentifier(
+                rawValue: "tool_plan_run_probe"
+            ),
             input: try JSONToolBridge.encode(
                 RunProbeInput(
                     marker: "fourth"
                 )
             )
         )
-        let plan = AgentToolPlan(
+        let plan = try ToolPlan(
             id: "single-step-resume-probe",
             root: .sequence(
                 [
@@ -421,43 +430,51 @@ enum AgenticExecutionFlowTesting {
 
     static func runToolPlanFailureBranchRetryResume() async throws -> [TestFlowDiagnostic] {
         let fixture = try makeFixture()
-        let prefix = AgentToolCall(
+        let prefix = ToolCall(
             id: "failure-branch-prefix",
-            name: "tool_plan_run_probe",
+            tool: ToolIdentifier(
+                rawValue: "tool_plan_run_probe"
+            ),
             input: try JSONToolBridge.encode(
                 RunProbeInput(
                     marker: "prefix"
                 )
             )
         )
-        let repair = AgentToolCall(
+        let repair = ToolCall(
             id: "failure-branch-repair",
-            name: "tool_plan_run_probe",
+            tool: ToolIdentifier(
+                rawValue: "tool_plan_run_probe"
+            ),
             input: try JSONToolBridge.encode(
                 RunProbeInput(
                     marker: "repair"
                 )
             )
         )
-        let branchFix = AgentToolCall(
+        let branchFix = ToolCall(
             id: "failure-branch-fix",
-            name: "tool_plan_run_probe",
+            tool: ToolIdentifier(
+                rawValue: "tool_plan_run_probe"
+            ),
             input: try JSONToolBridge.encode(
                 RunProbeInput(
                     marker: "branch-fix"
                 )
             )
         )
-        let suffix = AgentToolCall(
+        let suffix = ToolCall(
             id: "failure-branch-suffix",
-            name: "tool_plan_run_probe",
+            tool: ToolIdentifier(
+                rawValue: "tool_plan_run_probe"
+            ),
             input: try JSONToolBridge.encode(
                 RunProbeInput(
                     marker: "suffix"
                 )
             )
         )
-        let plan = AgentToolPlan(
+        let plan = try ToolPlan(
             id: "failure-branch-retry-resume-probe",
             root: .sequence(
                 [
@@ -676,10 +693,9 @@ enum AgenticExecutionFlowTesting {
 
     static func runToolPlanApprovalSkip() async throws -> [TestFlowDiagnostic] {
         let probe = PlanRunProbe()
-        let tool = PlanRunProbeTool(
-            identifier: "tool_plan_approval_skip_probe",
-            description: "Records ToolPlan execution while one reviewed call is explicitly skipped.",
-            risk: .boundedmutate,
+        let tool = PlanRunProbeTool<
+            PlanRunApprovalSkipIdentity
+        >(
             probe: probe
         )
         let invoker = ToolInvoker(
@@ -693,14 +709,16 @@ enum AgenticExecutionFlowTesting {
         let executor = AgentToolPlanRunExecutor(
             invoker: invoker
         )
-        let plan = AgentToolPlan(
+        let plan = try ToolPlan(
             id: "approval-skip-plan",
             root: .sequence(
                 [
                     .call(
-                        AgentToolCall(
+                        ToolCall(
                             id: "approval-prefix",
-                            name: "tool_plan_approval_skip_probe",
+                            tool: ToolIdentifier(
+                                rawValue: "tool_plan_approval_skip_probe"
+                            ),
                             input: try JSONToolBridge.encode(
                                 RunProbeInput(
                                     marker: "approval-prefix"
@@ -709,9 +727,11 @@ enum AgenticExecutionFlowTesting {
                         )
                     ),
                     .call(
-                        AgentToolCall(
+                        ToolCall(
                             id: "approval-skip",
-                            name: "tool_plan_approval_skip_probe",
+                            tool: ToolIdentifier(
+                                rawValue: "tool_plan_approval_skip_probe"
+                            ),
                             input: try JSONToolBridge.encode(
                                 RunProbeInput(
                                     marker: "approval-skip"
@@ -720,9 +740,11 @@ enum AgenticExecutionFlowTesting {
                         )
                     ),
                     .call(
-                        AgentToolCall(
+                        ToolCall(
                             id: "approval-suffix",
-                            name: "tool_plan_approval_skip_probe",
+                            tool: ToolIdentifier(
+                                rawValue: "tool_plan_approval_skip_probe"
+                            ),
                             input: try JSONToolBridge.encode(
                                 RunProbeInput(
                                     marker: "approval-suffix"
@@ -806,16 +828,15 @@ private struct SelectiveSkipApprovalHandler: ToolApprovalHandler {
 private extension AgenticExecutionFlowTesting {
     struct Fixture {
         let executor: AgentToolPlanRunExecutor
-        let plan: AgentToolPlan
+        let plan: ToolPlan
         let probe: PlanRunProbe
     }
 
     static func makeFixture() throws -> Fixture {
         let probe = PlanRunProbe()
-        let tool = PlanRunProbeTool(
-            identifier: "tool_plan_run_probe",
-            description: "Records execution order and fails the repair marker once.",
-            risk: .observe,
+        let tool = PlanRunProbeTool<
+            PlanRunDefaultIdentity
+        >(
             probe: probe
         )
         let invoker = ToolInvoker(
@@ -826,34 +847,40 @@ private extension AgenticExecutionFlowTesting {
                 autonomyMode: .auto_observe
             )
         )
-        let prefix = AgentToolCall(
+        let prefix = ToolCall(
             id: "prefix",
-            name: "tool_plan_run_probe",
+            tool: ToolIdentifier(
+                rawValue: "tool_plan_run_probe"
+            ),
             input: try JSONToolBridge.encode(
                 RunProbeInput(
                     marker: "prefix"
                 )
             )
         )
-        let repair = AgentToolCall(
+        let repair = ToolCall(
             id: "repair",
-            name: "tool_plan_run_probe",
+            tool: ToolIdentifier(
+                rawValue: "tool_plan_run_probe"
+            ),
             input: try JSONToolBridge.encode(
                 RunProbeInput(
                     marker: "repair"
                 )
             )
         )
-        let suffix = AgentToolCall(
+        let suffix = ToolCall(
             id: "suffix",
-            name: "tool_plan_run_probe",
+            tool: ToolIdentifier(
+                rawValue: "tool_plan_run_probe"
+            ),
             input: try JSONToolBridge.encode(
                 RunProbeInput(
                     marker: "suffix"
                 )
             )
         )
-        let plan = AgentToolPlan(
+        let plan = try ToolPlan(
             id: "resumable-plan-probe",
             root: .sequence(
                 [
@@ -874,20 +901,47 @@ private extension AgenticExecutionFlowTesting {
     }
 }
 
-private struct PlanRunProbeTool:
-    AgentTool
+private protocol PlanRunProbeIdentity {
+    static var definition: ToolDefinition { get }
+}
+
+private enum PlanRunDefaultIdentity:
+    PlanRunProbeIdentity
 {
+    static let definition = ToolDefinition(
+        identifier: "tool_plan_run_probe",
+        purpose:
+            "Records execution order and fails the repair marker once.",
+        risk: .observe
+    )
+}
+
+private enum PlanRunApprovalSkipIdentity:
+    PlanRunProbeIdentity
+{
+    static let definition = ToolDefinition(
+        identifier: "tool_plan_approval_skip_probe",
+        purpose:
+            "Records ToolPlan execution while one reviewed call is explicitly skipped.",
+        risk: .boundedmutate
+    )
+}
+
+private struct PlanRunProbeTool<
+    Identity: PlanRunProbeIdentity
+>: Tool {
     typealias Input = RunProbeInput
     typealias Output = RunProbeInput
 
-    let identifier: AgentToolIdentifier
-    let description: String
-    let risk: ActionRisk
+    static var definition: ToolDefinition {
+        Identity.definition
+    }
+
     let probe: PlanRunProbe
 
     func call(
         _ input: Input,
-        context _: AgentToolExecutionContext
+        workspace _: WorkspaceContext?
     ) async throws -> Output {
         try await probe.invoke(
             input

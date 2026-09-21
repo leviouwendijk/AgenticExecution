@@ -1,5 +1,4 @@
 import Agentic
-import AgenticRecovery
 
 /// Canonical mechanical result of one tool execution operation.
 ///
@@ -12,13 +11,13 @@ public struct AgentToolExecutionResult:
     Codable,
     Hashable
 {
-    public var result: AgentToolResult
-    public var failure: AgentToolCallFailure?
+    public var result: ToolResult
+    public var failure: ToolCall.Failure?
     public var recovery: Recovery.Record?
 
     public init(
-        result: AgentToolResult,
-        failure: AgentToolCallFailure? = nil,
+        result: ToolResult,
+        failure: ToolCall.Failure? = nil,
         recovery: Recovery.Record? = nil
     ) {
         self.result = result

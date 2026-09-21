@@ -1,6 +1,7 @@
 import Agentic
 import AgenticExecution
 import TestFlows
+import Workspace
 
 extension AgenticExecutionFlowTesting {
     static func runToolRegistryIntrinsics()
@@ -23,18 +24,16 @@ extension AgenticExecutionFlowTesting {
         )
 
         let registry = try Agentic.tool.registry {
-            ToolRegistryIntrinsicProbeTool(
-                identifier: "read_file",
-                description:
-                    "Read a bounded source file from the current workspace.",
-                risk: .observe,
+            AgentToolRegistration.tool(
+                ToolRegistryIntrinsicProbeTool<
+                    ReadFileIntrinsicIdentity
+                >(),
                 execution: .fixed
             )
-            ToolRegistryIntrinsicProbeTool(
-                identifier: "git_push",
-                description:
-                    "Push committed Git history to a configured remote repository.",
-                risk: .privileged,
+            AgentToolRegistration.tool(
+                ToolRegistryIntrinsicProbeTool<
+                    GitPushIntrinsicIdentity
+                >(),
                 execution: .targetable
             )
         }
@@ -71,10 +70,10 @@ extension AgenticExecutionFlowTesting {
                 \.identifier
             ),
             [
-                AgentToolIdentifier(
+                ToolIdentifier(
                     "git_push"
                 ),
-                AgentToolIdentifier(
+                ToolIdentifier(
                     "read_file"
                 ),
             ],
@@ -122,11 +121,10 @@ extension AgenticExecutionFlowTesting {
                 includeIntrinsicTools: false
             )
         ) {
-            ToolRegistryIntrinsicProbeTool(
-                identifier: "read_file",
-                description:
-                    "Read a bounded source file from the current workspace.",
-                risk: .observe,
+            AgentToolRegistration.tool(
+                ToolRegistryIntrinsicProbeTool<
+                    ReadFileIntrinsicIdentity
+                >(),
                 execution: .fixed
             )
         }
@@ -144,24 +142,6 @@ extension AgenticExecutionFlowTesting {
             "intrinsic hard opt-out leaves only declared tools"
         )
 
-        let setRegistry = try Agentic.tool.registry(
-            toolSets: [
-                ToolRegistryIntrinsicProbeSet(),
-            ]
-        )
-
-        try Expect.equal(
-            setRegistry.count,
-            2,
-            "tool-set bootstrap path also installs intrinsic tools"
-        )
-        _ = try Expect.notNil(
-            setRegistry.registeredTool(
-                named: InspectToolRegistryTool.identifier.rawValue
-            ),
-            "tool-set bootstrap path converges on canonical registry completion"
-        )
-
         return [
             .message(
                 "ToolRegistry stays bare at low level; Agentic.tool.registry installs inspect_tool_registry after declarations by default, captures only the completed declared registry, and honors the bootstrap hard opt-out."
@@ -176,59 +156,65 @@ private extension AgenticExecutionFlowTesting {
         input: InspectToolRegistryToolInput
     ) async throws -> InspectToolRegistryToolOutput {
         let result = try await registry.execute(
-            AgentToolCall(
+            ToolCall(
                 id: "inspect-tool-registry-intrinsic-test",
-                name: InspectToolRegistryTool
-                    .identifier
-                    .rawValue,
+                tool: InspectToolRegistryTool
+                    .identifier,
                 input: try JSONToolBridge.encode(
                     input
                 )
             ),
-            context: .init()
+            workspace: nil
         )
 
         return try JSONToolBridge.decode(
             InspectToolRegistryToolOutput.self,
-            from: result.output
+            from: result.result.output
         )
     }
 }
 
-private struct ToolRegistryIntrinsicProbeSet:
-    AgentToolSet
-{
-    func register(
-        into registry: inout ToolRegistry
-    ) throws {
-        try registry.register {
-            ToolRegistryIntrinsicProbeTool(
-                identifier: "set_probe",
-                description:
-                    "Probe tool registered through an AgentToolSet.",
-                risk: .observe,
-                execution: .fixed
-            )
-        }
-    }
+private protocol ToolRegistryIntrinsicIdentity {
+    static var definition: ToolDefinition { get }
 }
 
-private struct ToolRegistryIntrinsicProbeTool:
-    AgentTool
+private enum ReadFileIntrinsicIdentity:
+    ToolRegistryIntrinsicIdentity
 {
+    static let definition = ToolDefinition(
+        identifier: "read_file",
+        purpose:
+            "Read a bounded source file from the current workspace.",
+        risk: .observe
+    )
+}
+
+private enum GitPushIntrinsicIdentity:
+    ToolRegistryIntrinsicIdentity
+{
+    static let definition = ToolDefinition(
+        identifier: "git_push",
+        purpose:
+            "Push committed Git history to a configured remote repository.",
+        risk: .privileged
+    )
+}
+
+private struct ToolRegistryIntrinsicProbeTool<
+    Identity: ToolRegistryIntrinsicIdentity
+>: Tool {
     typealias Input =
         InspectToolRegistryToolInput
     typealias Output =
         InspectToolRegistryToolInput
 
-    let identifier: AgentToolIdentifier
-    let description: String
-    let risk: ActionRisk
-    let execution: AgentToolExecutionContract
+    static var definition: ToolDefinition {
+        Identity.definition
+    }
 
     func call(
         _ input: Input,
-        context _: AgentToolExecutionContext
+        workspace _: WorkspaceContext?
     ) async throws -> Output {
         input
     }

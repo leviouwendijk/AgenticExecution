@@ -1,5 +1,18 @@
 import Agentic
-import AgenticWorkspace
+
+public struct WorkspaceTarget:
+    Sendable,
+    Codable,
+    Hashable
+{
+    public let subpath: String
+
+    public init(
+        subpath: String
+    ) {
+        self.subpath = subpath
+    }
+}
 
 public enum ToolInvocation {}
 
@@ -21,13 +34,13 @@ public extension ToolInvocation {
 
 public extension ToolInvocation {
     struct Review: Sendable, Codable, Hashable {
-        public let call: AgentToolCall
+        public let call: ToolCall
         public let preflight: ToolPreflight
         public let requirement: ApprovalRequirement
         public let guidelineRelations: [AgentGuidelineRelation]
 
         public init(
-            call: AgentToolCall,
+            call: ToolCall,
             preflight: ToolPreflight,
             requirement: ApprovalRequirement,
             guidelineRelations: [AgentGuidelineRelation] = []
@@ -56,7 +69,7 @@ public extension ToolInvocation {
             )
 
             self.call = try container.decode(
-                AgentToolCall.self,
+                ToolCall.self,
                 forKey: .call
             )
 

@@ -1,6 +1,6 @@
 import Agentic
-import AgenticRecovery
-import AgenticWorkspace
+import Foundation
+import Workspace
 
 public struct ToolInvoker: Sendable {
     public let registry: ToolRegistry
@@ -18,25 +18,21 @@ public struct ToolInvoker: Sendable {
     }
 
     public func review(
-        _ call: AgentToolCall,
+        _ call: ToolCall,
         execution: ToolInvocation.Execution? = nil,
-        context: AgentToolExecutionContext = .init()
+        workspace: WorkspaceContext? = nil,
+        guidelineRelations: [AgentGuidelineRelation] = []
     ) async throws -> ToolInvocation.Review {
-        let context = try targetedContext(
+        let workspace = try targetedWorkspace(
             for: call,
             execution: execution,
-            context: context
+            workspace: workspace
         )
 
-        var preflight = try await registry.preflight(
+        let preflight = try await registry.preflight(
             call,
-            context: context
+            workspace: workspace
         )
-
-        preflight.workingDirectory =
-            context.workspaceLocation?
-                .absoluteURL
-                .path
 
         return .init(
             call: call,
@@ -44,25 +40,27 @@ public struct ToolInvoker: Sendable {
             requirement: policy.evaluate(
                 preflight
             ),
-            guidelineRelations: context.guidelineRelations
+            guidelineRelations: guidelineRelations
         )
     }
 
     public func invoke(
-        _ call: AgentToolCall,
+        _ call: ToolCall,
         execution: ToolInvocation.Execution? = nil,
-        context: AgentToolExecutionContext = .init(),
+        workspace: WorkspaceContext? = nil,
+        guidelineRelations: [AgentGuidelineRelation] = [],
         approvalHandler: (any ToolApprovalHandler)? = nil
     ) async throws -> ToolInvocation.Result {
-        let context = try targetedContext(
+        let workspace = try targetedWorkspace(
             for: call,
             execution: execution,
-            context: context
+            workspace: workspace
         )
 
         let review = try await review(
             call,
-            context: context
+            workspace: workspace,
+            guidelineRelations: guidelineRelations
         )
 
         let decision: ApprovalDecision
@@ -99,7 +97,7 @@ public struct ToolInvoker: Sendable {
         let toolExecution = try await executeApproved(
             call,
             preflight: review.preflight,
-            context: context
+            workspace: workspace
         )
 
         return .init(
@@ -110,57 +108,65 @@ public struct ToolInvoker: Sendable {
     }
 
     public func invoke(
-        _ plan: AgentToolPlan,
-        context: AgentToolExecutionContext = .init(),
+        _ plan: ToolPlan,
+        workspace: WorkspaceContext? = nil,
+        guidelineRelations: [AgentGuidelineRelation] = [],
         approvalHandler: (any ToolApprovalHandler)? = nil
     ) async throws -> AgentToolPlanResult {
         try await AgentToolPlanExecutor(
             invoker: self
         ).execute(
             plan,
-            context: context,
+            workspace: workspace,
+            guidelineRelations: guidelineRelations,
             approvalHandler: approvalHandler
         )
     }
 }
 
 private extension ToolInvoker {
-    func targetedContext(
-        for call: AgentToolCall,
+    func targetedWorkspace(
+        for call: ToolCall,
         execution: ToolInvocation.Execution?,
-        context: AgentToolExecutionContext
-    ) throws -> AgentToolExecutionContext {
+        workspace: WorkspaceContext?
+    ) throws -> WorkspaceContext? {
         guard let target = execution?.workspace else {
-            return context
+            return workspace
         }
 
         guard let tool = registry.registeredTool(
-            named: call.name
+            identifiedBy: call.tool
         ) else {
-            throw ToolDispatchError.unknownTool(
-                call.name
+            throw ToolRegistryExecutionError.missingTool(
+                call.tool.rawValue
             )
         }
 
         guard
             tool.capability.execution.workingLocation
-                == .targetable
+                == AgentToolExecutionContract.WorkingLocation.targetable
         else {
             throw WorkspaceToolTargetingError.unsupportedTool(
-                call.name
+                call.tool.rawValue
             )
         }
 
-        guard let workspace = context.workspace else {
+        guard let workspace else {
             throw WorkspaceToolTargetingError.workspaceRequired(
-                call.name
+                call.tool.rawValue
             )
         }
 
-        return context.withWorkspaceLocation(
-            try workspace.location(
-                for: target
-            )
+        let subpath = target.subpath.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+
+        guard !subpath.isEmpty else {
+            throw WorkspaceToolTargetingError.emptySubpath
+        }
+
+        return try workspace.context(
+            atRootPath: subpath
         )
     }
 }

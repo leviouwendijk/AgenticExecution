@@ -7,9 +7,9 @@ public enum AgentToolExposurePolicy:
 {
     case all
     case explicit(
-        [AgentToolIdentifier]
+        [ToolIdentifier]
     )
     case discoverable(
-        [AgentToolIdentifier]
+        [ToolIdentifier]
     )
 }

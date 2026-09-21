@@ -1,22 +1,23 @@
 import Agentic
 import AgenticExecution
-import AgenticRecovery
 import Foundation
 import Primitives
 import Schema
 import TestFlows
+import Workspace
 
 extension AgenticExecutionFlowTesting {
     static func runToolCallFailureEnvelope() async throws -> [TestFlowDiagnostic] {
         try await provePhase(
             .decode,
-            tool: PhaseFailureTool(
-                identifier: "phase_failure_decode",
+            tool: PhaseFailureTool<PhaseFailureDecodeIdentity>(
                 failurePhase: .call
             ),
-            call: AgentToolCall(
+            call: ToolCall(
                 id: "phase-failure-decode-call",
-                name: "phase_failure_decode",
+                tool: ToolIdentifier(
+                    rawValue: "phase_failure_decode"
+                ),
                 input: .object([:])
             ),
             operation: .execute
@@ -24,8 +25,7 @@ extension AgenticExecutionFlowTesting {
 
         try await provePhase(
             .preflight,
-            tool: PhaseFailureTool(
-                identifier: "phase_failure_preflight",
+            tool: PhaseFailureTool<PhaseFailurePreflightIdentity>(
                 failurePhase: .preflight
             ),
             call: try phaseCall(
@@ -37,8 +37,7 @@ extension AgenticExecutionFlowTesting {
 
         try await provePhase(
             .call,
-            tool: PhaseFailureTool(
-                identifier: "phase_failure_call",
+            tool: PhaseFailureTool<PhaseFailureCallIdentity>(
                 failurePhase: .call
             ),
             call: try phaseCall(
@@ -50,8 +49,7 @@ extension AgenticExecutionFlowTesting {
 
         try await provePhase(
             .process,
-            tool: PhaseFailureTool(
-                identifier: "phase_failure_process",
+            tool: PhaseFailureTool<PhaseFailureProcessIdentity>(
                 failurePhase: .process
             ),
             call: try phaseCall(
@@ -70,7 +68,7 @@ extension AgenticExecutionFlowTesting {
         return [
             .field(
                 "phases",
-                AgentToolCallPhase.allCases
+                ToolCall.Phase.allCases
                     .map(\.rawValue)
                     .joined(separator: ",")
             ),
@@ -95,10 +93,10 @@ private enum PhaseFailureOperation {
     case execute
 }
 
-private func provePhase(
-    _ expectedPhase: AgentToolCallPhase,
-    tool: PhaseFailureTool,
-    call: AgentToolCall,
+private func provePhase<T: Tool>(
+    _ expectedPhase: ToolCall.Phase,
+    tool: T,
+    call: ToolCall,
     operation: PhaseFailureOperation
 ) async throws {
     let registry = try ToolRegistry {
@@ -110,13 +108,13 @@ private func provePhase(
         case .preflight:
             _ = try await registry.preflight(
                 call,
-                context: .init()
+                workspace: nil
             )
 
         case .execute:
             _ = try await registry.execute(
                 call,
-                context: .init()
+                workspace: nil
             )
         }
     }
@@ -150,7 +148,7 @@ private func proveEncodePhase() async throws {
     let failure = try await capturedFailure {
         _ = try await registry.execute(
             call,
-            context: .init()
+            workspace: nil
         )
     }
 
@@ -178,23 +176,19 @@ private func proveReportedFailureResult() async throws {
 
     let result = try await registry.execute(
         call,
-        context: .init()
+        workspace: nil
     )
     let output = try JSONToolBridge.decode(
         PhaseFailureOutput.self,
-        from: result.output
-    )
-    let processing = try Expect.notNil(
-        result.processing,
-        "reported failure retains result processing"
+        from: result.result.output
     )
     let projection = try Expect.notNil(
-        processing.projection,
+        result.result.projection,
         "reported failure still runs typed process"
     )
 
     try Expect.true(
-        result.isError,
+        result.result.isError,
         "typed reported failure becomes a model-visible error result"
     )
     try Expect.equal(
@@ -207,18 +201,10 @@ private func proveReportedFailureResult() async throws {
         "failed",
         "reported failure retains its semantic projection"
     )
-    try Expect.equal(
-        processing.observations.map(\.content),
-        [
-            "reported:reported",
-        ],
-        "reported failure retains temporal observations"
-    )
 }
 
 private func proveToolPlanFailurePersistence() async throws {
-    let tool = PhaseFailureTool(
-        identifier: "phase_failure_plan",
+    let tool = PhaseFailureTool<PhaseFailurePlanIdentity>(
         failurePhase: .call
     )
     let invoker = ToolInvoker(
@@ -233,7 +219,7 @@ private func proveToolPlanFailurePersistence() async throws {
         id: "phase-failure-plan-call",
         name: tool.identifier.rawValue
     )
-    let plan = AgentToolPlan(
+    let plan = try ToolPlan(
         id: "phase-failure-plan",
         root: .call(
             call
@@ -294,7 +280,7 @@ private func proveRecoveryErrorEvidence() async throws -> Bool {
     let failure = try await capturedFailure {
         _ = try await registry.execute(
             call,
-            context: .init()
+            workspace: nil
         )
     }
 
@@ -345,14 +331,14 @@ private func proveRecoveryErrorEvidence() async throws -> Bool {
         "operational recovery message remains distinct from the underlying diagnostic message"
     )
     try Expect.equal(
-        incident.metadata["tool_call_id"],
+        failure.toolCallID,
         call.id,
-        "AgentTool classification receives canonical call context"
+        "canonical failure envelope carries the tool call identity independently of classification"
     )
     try Expect.equal(
         incident.metadata["input"],
         "fixture",
-        "AgentTool classification receives typed input after decode"
+        "Tool classification receives typed input after decode"
     )
 
     let report = try Expect.notNil(
@@ -367,24 +353,24 @@ private func proveRecoveryErrorEvidence() async throws -> Bool {
     )
 
     let persisted = try JSONDecoder().decode(
-        AgentToolCallFailure.self,
+        ToolCall.Failure.self,
         from: JSONEncoder().encode(
             failure
         )
     )
     let persistedIncident = try Expect.notNil(
         persisted.incident,
-        "AgentToolCallFailure Codable round trip retains the recovery incident"
+        "ToolCall.Failure Codable round trip retains the recovery incident"
     )
 
     try Expect.equal(
         persisted,
         failure,
-        "AgentToolCallFailure Codable round trip preserves structured recovery evidence"
+        "ToolCall.Failure Codable round trip preserves structured recovery evidence"
     )
     _ = try Expect.notNil(
         persistedIncident.report,
-        "AgentToolCallFailure persistence retains the incident ErrorReport"
+        "ToolCall.Failure persistence retains the incident ErrorReport"
     )
 
     return true
@@ -392,10 +378,10 @@ private func proveRecoveryErrorEvidence() async throws -> Bool {
 
 private func capturedFailure(
     _ operation: () async throws -> Void
-) async throws -> AgentToolCallFailure {
+) async throws -> ToolCall.Failure {
     do {
         try await operation()
-    } catch let error as AgentToolCallError {
+    } catch let error as ToolCall.Error {
         return error.failure
     }
 
@@ -405,10 +391,12 @@ private func capturedFailure(
 private func phaseCall(
     id: String,
     name: String
-) throws -> AgentToolCall {
-    AgentToolCall(
+) throws -> ToolCall {
+    ToolCall(
         id: id,
-        name: name,
+        tool: ToolIdentifier(
+            rawValue: name
+        ),
         input: try JSONToolBridge.encode(
             PhaseFailureInput(
                 value: "fixture"
@@ -433,44 +421,90 @@ private struct PhaseFailureInput:
 private struct PhaseFailureOutput:
     Sendable,
     Codable,
-    Hashable
+    Hashable,
+    JSONSchemaProviding
 {
     let value: String
+
+    static var jsonschema: JSONSchema {
+        .any
+    }
 }
 
-private struct PhaseFailureTool: AgentTool {
+private protocol PhaseFailureToolIdentity {
+    static var identifier: ToolIdentifier { get }
+}
+
+private enum PhaseFailureDecodeIdentity:
+    PhaseFailureToolIdentity
+{
+    static let identifier:
+        ToolIdentifier = "phase_failure_decode"
+}
+
+private enum PhaseFailurePreflightIdentity:
+    PhaseFailureToolIdentity
+{
+    static let identifier:
+        ToolIdentifier = "phase_failure_preflight"
+}
+
+private enum PhaseFailureCallIdentity:
+    PhaseFailureToolIdentity
+{
+    static let identifier:
+        ToolIdentifier = "phase_failure_call"
+}
+
+private enum PhaseFailureProcessIdentity:
+    PhaseFailureToolIdentity
+{
+    static let identifier:
+        ToolIdentifier = "phase_failure_process"
+}
+
+private enum PhaseFailurePlanIdentity:
+    PhaseFailureToolIdentity
+{
+    static let identifier:
+        ToolIdentifier = "phase_failure_plan"
+}
+
+private struct PhaseFailureTool<
+    Identity: PhaseFailureToolIdentity
+>: Tool {
     typealias Input = PhaseFailureInput
     typealias Output = PhaseFailureOutput
 
-    let identifier: AgentToolIdentifier
-    let failurePhase: AgentToolCallPhase
-
-    var description: String {
-        "Exercises one phase-aware AgentTool failure."
+    static var definition: ToolDefinition {
+        .init(
+            identifier: Identity.identifier,
+            purpose:
+                "Exercises one phase-aware Tool failure.",
+            risk: .observe
+        )
     }
 
-    var risk: ActionRisk {
-        .observe
-    }
+    let failurePhase: ToolCall.Phase
 
     func preflight(
         _ input: Input,
-        context _: AgentToolExecutionContext
+        workspace _: WorkspaceContext?
     ) async throws -> ToolPreflight {
         if failurePhase == .preflight {
             throw PhaseFailureProbeError.preflight
         }
 
         return ToolPreflight(
-            toolName: name,
-            risk: risk,
+            tool: Self.definition.identifier,
+            risk: Self.definition.risk,
             summary: "fixture:\(input.value)"
         )
     }
 
     func call(
         _ input: Input,
-        context _: AgentToolExecutionContext
+        workspace _: WorkspaceContext?
     ) async throws -> Output {
         if failurePhase == .call {
             throw PhaseFailureProbeError.call
@@ -483,9 +517,8 @@ private struct PhaseFailureTool: AgentTool {
 
     func process(
         _ output: Output,
-        input _: Input,
-        context _: AgentToolExecutionContext
-    ) throws -> AgentToolResultProjection? {
+        input _: Input
+    ) throws -> ToolCall.ResultProjection? {
         if failurePhase == .process {
             throw PhaseFailureProbeError.process
         }
@@ -497,35 +530,31 @@ private struct PhaseFailureTool: AgentTool {
     }
 }
 
-private struct RecoveryFailureTool: AgentTool {
+private struct RecoveryFailureTool: Tool {
     typealias Input = PhaseFailureInput
     typealias Output = PhaseFailureOutput
 
-    let identifier: AgentToolIdentifier =
-        "recovery_failure_evidence"
-
-    var description: String {
-        "Exercises structured recovery evidence for a typed tool failure."
-    }
-
-    var risk: ActionRisk {
-        .observe
-    }
+    static let definition = ToolDefinition(
+        identifier: "recovery_failure_evidence",
+        purpose:
+            "Exercises structured recovery evidence for a typed tool failure.",
+        risk: .observe
+    )
 
     func preflight(
         _ input: Input,
-        context _: AgentToolExecutionContext
+        workspace _: WorkspaceContext?
     ) async throws -> ToolPreflight {
         ToolPreflight(
-            toolName: name,
-            risk: risk,
+            tool: Self.definition.identifier,
+            risk: Self.definition.risk,
             summary: "recovery-evidence:\(input.value)"
         )
     }
 
     func call(
         _ input: Input,
-        context _: AgentToolExecutionContext
+        workspace _: WorkspaceContext?
     ) async throws -> Output {
         _ = input
         throw PhaseFailureProbeError.call
@@ -533,9 +562,8 @@ private struct RecoveryFailureTool: AgentTool {
 
     func classify(
         _ error: any Error,
-        phase: AgentToolCallPhase,
-        input: Input?,
-        context: AgentToolExecutionContext
+        phase: ToolCall.Phase,
+        input: Input?
     ) -> Recovery.Incident? {
         guard
             phase == .call,
@@ -552,11 +580,11 @@ private struct RecoveryFailureTool: AgentTool {
             retrySafety: .safe,
             scope: .init(
                 kind: .tool,
-                identifier: identifier.rawValue
+                identifier:
+                    Self.definition.identifier.rawValue
             ),
             message: "fixture classified tool failure",
             metadata: [
-                "tool_call_id": context.toolCallID ?? "missing",
                 "input": input?.value ?? "missing",
             ]
         )
@@ -564,80 +592,77 @@ private struct RecoveryFailureTool: AgentTool {
 }
 
 private struct EncodeFailureOutput:
-    Encodable,
-    Sendable
+    Codable,
+    Sendable,
+    JSONSchemaProviding
 {
+    init() {}
+
+    init(
+        from decoder: any Decoder
+    ) throws {
+        _ = decoder
+    }
+
     func encode(
         to encoder: any Encoder
     ) throws {
         _ = encoder
         throw PhaseFailureProbeError.encode
     }
+
+    static var jsonschema: JSONSchema {
+        .any
+    }
 }
 
-private struct EncodeFailureTool: AgentTool {
+private struct EncodeFailureTool: Tool {
     typealias Input = PhaseFailureInput
     typealias Output = EncodeFailureOutput
 
-    let identifier: AgentToolIdentifier =
-        "phase_failure_encode"
-
-    let description =
-        "Exercises output encoding failure."
-
-    let risk: ActionRisk =
-        .observe
+    static let definition = ToolDefinition(
+        identifier: "phase_failure_encode",
+        purpose: "Exercises output encoding failure.",
+        risk: .observe
+    )
 
     func call(
         _ input: Input,
-        context _: AgentToolExecutionContext
+        workspace _: WorkspaceContext?
     ) async throws -> Output {
         _ = input
         return .init()
     }
 }
 
-private struct ReportedFailureTool: AgentTool {
+private struct ReportedFailureTool: Tool {
     typealias Input = PhaseFailureInput
     typealias Output = PhaseFailureOutput
 
-    let identifier: AgentToolIdentifier =
-        "typed_reported_failure"
-
-    let description =
-        "Exercises typed model-visible reported failure."
-
-    let risk: ActionRisk =
-        .observe
+    static let definition = ToolDefinition(
+        identifier: "typed_reported_failure",
+        purpose:
+            "Exercises typed model-visible reported failure.",
+        risk: .observe
+    )
 
     func call(
         _ input: Input,
-        context: AgentToolExecutionContext
+        workspace _: WorkspaceContext?
     ) async throws -> Output {
-        let output = Output(
-            value: "reported"
-        )
-
-        await context.observe(
-            .init(
-                kind: .diagnostic,
-                label: "reported",
-                content: "reported:\(output.value)"
-            )
-        )
-
         _ = input
 
         throw AgentToolReportedFailure(
-            output: output
+            output: Output(
+                value: "reported"
+            )
         )
     }
 
     func process(
         _ output: Output,
-        input _: Input,
-        context _: AgentToolExecutionContext
-    ) -> AgentToolResultProjection? {
+        input _: Input
+    ) -> ToolCall.ResultProjection? {
         .init(
             status: "failed",
             summary: output.value

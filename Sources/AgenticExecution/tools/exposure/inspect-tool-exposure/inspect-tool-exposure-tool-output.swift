@@ -1,18 +1,20 @@
 import Agentic
+import Schema
 
 public struct InspectToolExposureToolOutput:
     Sendable,
     Codable,
-    Hashable
+    Hashable,
+    JSONSchemaProviding
 {
     public let policy: AgentToolExposurePolicy
     public let registeredModelFacingCount: Int
     public let exposedCount: Int
     public let hiddenCount: Int
-    public let exposedIdentifiers: [AgentToolIdentifier]
-    public let seededIdentifiers: [AgentToolIdentifier]
-    public let activatedIdentifiers: [AgentToolIdentifier]
-    public let hiddenIdentifiers: [AgentToolIdentifier]?
+    public let exposedIdentifiers: [ToolIdentifier]
+    public let seededIdentifiers: [ToolIdentifier]
+    public let activatedIdentifiers: [ToolIdentifier]
+    public let hiddenIdentifiers: [ToolIdentifier]?
 
     public init(
         inspection: AgentToolExposureInspection,
@@ -29,5 +31,9 @@ public struct InspectToolExposureToolOutput:
         hiddenIdentifiers = includeHiddenIdentifiers
             ? inspection.hiddenIdentifiers
             : nil
+    }
+
+    public static var jsonschema: JSONSchema {
+        .any
     }
 }

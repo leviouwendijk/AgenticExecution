@@ -15,38 +15,19 @@ public struct ToolExecutionPolicy: Sendable, Codable, Hashable {
     public func evaluate(
         _ preflight: ToolPreflight
     ) -> ApprovalRequirement {
-        if preflight.risk == .forbidden
-            || preflight.policyDirectives?.contains(
-                .require_deny
-            ) == true
-        {
+        if preflight.risk == .forbidden {
             return .denied_forbidden
         }
 
-        let effectiveLimits = limits.merged(
-            with: preflight.limits
-        )
-
-        if effectiveLimits.requiresHumanReview(
+        if limits.requiresHumanReview(
             for: preflight
         ) {
             return .needs_human_review
         }
 
-        let requirement = autonomyRequirement(
+        return autonomyRequirement(
             for: preflight.risk
         )
-
-        guard
-            requirement == .no_approval_needed,
-            preflight.policyDirectives?.contains(
-                .require_human_review
-            ) == true
-        else {
-            return requirement
-        }
-
-        return .needs_human_review
     }
 
     public func decision(

@@ -7,10 +7,10 @@ public struct AgentToolExposureInspection:
 {
     public let policy: AgentToolExposurePolicy
     public let registeredModelFacingCount: Int
-    public let exposedIdentifiers: [AgentToolIdentifier]
-    public let hiddenIdentifiers: [AgentToolIdentifier]
-    public let seededIdentifiers: [AgentToolIdentifier]
-    public let activatedIdentifiers: [AgentToolIdentifier]
+    public let exposedIdentifiers: [ToolIdentifier]
+    public let hiddenIdentifiers: [ToolIdentifier]
+    public let seededIdentifiers: [ToolIdentifier]
+    public let activatedIdentifiers: [ToolIdentifier]
 
     public var exposedCount: Int {
         exposedIdentifiers.count
@@ -23,10 +23,10 @@ public struct AgentToolExposureInspection:
     public init(
         policy: AgentToolExposurePolicy,
         registeredModelFacingCount: Int,
-        exposedIdentifiers: [AgentToolIdentifier],
-        hiddenIdentifiers: [AgentToolIdentifier],
-        seededIdentifiers: [AgentToolIdentifier],
-        activatedIdentifiers: [AgentToolIdentifier]
+        exposedIdentifiers: [ToolIdentifier],
+        hiddenIdentifiers: [ToolIdentifier],
+        seededIdentifiers: [ToolIdentifier],
+        activatedIdentifiers: [ToolIdentifier]
     ) {
         self.policy = policy
         self.registeredModelFacingCount = registeredModelFacingCount

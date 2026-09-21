@@ -27,11 +27,7 @@ let package = Package(
             branch: "master"
         ),
         .package(
-            url: "https://github.com/leviouwendijk/AgenticRecovery.git",
-            branch: "master"
-        ),
-        .package(
-            url: "https://github.com/leviouwendijk/AgenticWorkspace.git",
+            url: "https://github.com/leviouwendijk/Workspace.git",
             branch: "master"
         ),
         .package(
@@ -68,12 +64,8 @@ let package = Package(
                     package: "Agentic"
                 ),
                 .product(
-                    name: "AgenticRecovery",
-                    package: "AgenticRecovery"
-                ),
-                .product(
-                    name: "AgenticWorkspace",
-                    package: "AgenticWorkspace"
+                    name: "Workspace",
+                    package: "Workspace"
                 ),
                 .product(
                     name: "Primitives",
@@ -106,12 +98,8 @@ let package = Package(
                     package: "Agentic"
                 ),
                 .product(
-                    name: "AgenticRecovery",
-                    package: "AgenticRecovery"
-                ),
-                .product(
-                    name: "AgenticWorkspace",
-                    package: "AgenticWorkspace"
+                    name: "Workspace",
+                    package: "Workspace"
                 ),
                 .product(
                     name: "Primitives",

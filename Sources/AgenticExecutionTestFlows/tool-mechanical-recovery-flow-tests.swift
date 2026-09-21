@@ -1,9 +1,9 @@
 import Agentic
 import AgenticExecution
-import AgenticRecovery
 import Primitives
 import Schema
 import TestFlows
+import Workspace
 
 extension AgenticExecutionFlowTesting {
     static func runToolMechanicalObserveRetry() async throws -> [TestFlowDiagnostic] {
@@ -255,7 +255,7 @@ extension AgenticExecutionFlowTesting {
             scenario: .observe_retry
         )
         let result = try await fixture.invoker.invoke(
-            AgentToolPlan(
+            ToolPlan(
                 id: "mechanical-recovery-plan-evidence",
                 root: .call(
                     fixture.call
@@ -349,7 +349,7 @@ private extension AgenticExecutionFlowTesting {
         scenario: MechanicalRecoveryScenario
     ) throws -> (
         invoker: ToolInvoker,
-        call: AgentToolCall
+        call: ToolCall
     ) {
         let probe = MechanicalRecoveryProbe()
         let tool = MechanicalRecoveryTool(
@@ -364,9 +364,9 @@ private extension AgenticExecutionFlowTesting {
             ),
             recovery: mechanicalRecoveryPolicy
         )
-        let call = AgentToolCall(
+        let call = ToolCall(
             id: "mechanical-recovery-\(scenario.rawValue)",
-            name: tool.identifier.rawValue,
+            tool: tool.identifier,
             input: try JSONToolBridge.encode(
                 MechanicalRecoveryInput(
                     scenario: scenario.rawValue
@@ -463,9 +463,14 @@ private struct MechanicalRecoveryInput:
 
 private struct MechanicalRecoveryOutput:
     Sendable,
-    Codable
+    Codable,
+    JSONSchemaProviding
 {
     let value: String
+
+    static var jsonschema: JSONSchema {
+        .any
+    }
 }
 
 private enum MechanicalRecoveryFixtureError: Error {
@@ -494,18 +499,22 @@ private actor MechanicalRecoveryProbe {
     }
 }
 
-private struct MechanicalRecoveryTool: AgentTool {
+private struct MechanicalRecoveryTool: Tool {
     typealias Input = MechanicalRecoveryInput
     typealias Output = MechanicalRecoveryOutput
 
-    let identifier: AgentToolIdentifier = "mechanical_recovery_fixture"
-    let description = "Exercises canonical mechanical tool recovery."
-    let risk: ActionRisk = .boundedmutate
+    static let definition = ToolDefinition(
+        identifier: "mechanical_recovery_fixture",
+        purpose:
+            "Exercises canonical mechanical tool recovery.",
+        risk: .boundedmutate
+    )
+
     let probe: MechanicalRecoveryProbe
 
     func preflight(
         _ input: Input,
-        context: AgentToolExecutionContext
+        workspace _: WorkspaceContext?
     ) async throws -> ToolPreflight {
         let scenario = try scenario(
             from: input
@@ -524,17 +533,17 @@ private struct MechanicalRecoveryTool: AgentTool {
         }
 
         return ToolPreflight(
-            toolName: identifier.rawValue,
+            tool: Self.definition.identifier,
             risk: scenario.risk,
-            workspaceRoot: context.workspace?.rootURL.path,
             summary: summary,
-            sideEffects: scenario.risk.defaultSideEffects
+            sideEffects:
+                scenario.risk.defaultSideEffects
         )
     }
 
     func call(
         _ input: Input,
-        context _: AgentToolExecutionContext
+        workspace _: WorkspaceContext?
     ) async throws -> Output {
         let scenario = try scenario(
             from: input
@@ -572,9 +581,8 @@ private struct MechanicalRecoveryTool: AgentTool {
 
     func classify(
         _ error: any Error,
-        phase: AgentToolCallPhase,
-        input: Input?,
-        context _: AgentToolExecutionContext
+        phase: ToolCall.Phase,
+        input: Input?
     ) -> Recovery.Incident? {
         guard
             phase == .call,
@@ -599,9 +607,11 @@ private struct MechanicalRecoveryTool: AgentTool {
                 retrySafety: .safe,
                 scope: .init(
                     kind: .tool,
-                    identifier: identifier.rawValue
+                    identifier:
+                        Self.definition.identifier.rawValue
                 ),
-                message: "fixture observe transient failure"
+                message:
+                    "fixture observe transient failure"
             )
 
         case .mutation_applied,
@@ -620,18 +630,20 @@ private struct MechanicalRecoveryTool: AgentTool {
                 retrySafety: .requires_reconciliation,
                 scope: .init(
                     kind: .tool,
-                    identifier: identifier.rawValue
+                    identifier:
+                        Self.definition.identifier.rawValue
                 ),
-                message: "fixture mutation outcome is initially unknown"
+                message:
+                    "fixture mutation outcome is initially unknown"
             )
         }
     }
 
     func reconcile(
         _ input: Input,
-        after failure: AgentToolCallFailure,
-        context _: AgentToolExecutionContext
-    ) async throws -> AgentToolReconciliation<Output>? {
+        after failure: ToolCall.Failure,
+        workspace _: WorkspaceContext?
+    ) async throws -> ToolCall.Reconciliation<Output>? {
         _ = failure
 
         switch try scenario(

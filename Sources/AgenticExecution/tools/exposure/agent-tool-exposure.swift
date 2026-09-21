@@ -1,11 +1,11 @@
 import Agentic
 import Foundation
 
-public actor AgentToolExposure {
+public actor AgentToolExposure: ToolExposure {
     public let policy: AgentToolExposurePolicy
 
     private var activeIdentifiers:
-        Set<AgentToolIdentifier>
+        Set<ToolIdentifier>
 
     public init(
         policy: AgentToolExposurePolicy = .all
@@ -26,7 +26,7 @@ public actor AgentToolExposure {
 
     public func definitions(
         in registry: ToolRegistry
-    ) throws -> [AgentToolDefinition] {
+    ) throws -> [ToolDescriptor] {
         switch policy {
         case .all:
             registry.modelFacingDefinitions
@@ -41,7 +41,7 @@ public actor AgentToolExposure {
 
     public func identifiers(
         in registry: ToolRegistry
-    ) throws -> [AgentToolIdentifier] {
+    ) throws -> [ToolIdentifier] {
         try definitions(
             in: registry
         ).map(
@@ -60,9 +60,9 @@ public actor AgentToolExposure {
                 .map(\.identifier)
         )
 
-        let exposed: Set<AgentToolIdentifier>
-        let seeded: Set<AgentToolIdentifier>
-        let activated: Set<AgentToolIdentifier>
+        let exposed: Set<ToolIdentifier>
+        let seeded: Set<ToolIdentifier>
+        let activated: Set<ToolIdentifier>
 
         switch policy {
         case .all:
@@ -90,8 +90,8 @@ public actor AgentToolExposure {
             registered.subtracting(exposed)
 
         func ordered(
-            _ identifiers: Set<AgentToolIdentifier>
-        ) -> [AgentToolIdentifier] {
+            _ identifiers: Set<ToolIdentifier>
+        ) -> [ToolIdentifier] {
             identifiers.sorted {
                 $0.rawValue < $1.rawValue
             }
@@ -108,7 +108,7 @@ public actor AgentToolExposure {
     }
 
     public func isExposed(
-        _ identifier: AgentToolIdentifier,
+        _ identifier: ToolIdentifier,
         in registry: ToolRegistry
     ) -> Bool {
         guard registry.modelFacingDefinition(
@@ -131,9 +131,18 @@ public actor AgentToolExposure {
 
     @discardableResult
     public func activate(
-        _ identifiers: [AgentToolIdentifier],
+        _ identifiers: [ToolIdentifier]
+    ) async throws -> [ToolIdentifier] {
+        try activateKnownIdentifiers(
+            identifiers
+        )
+    }
+
+    @discardableResult
+    public func activate(
+        _ identifiers: [ToolIdentifier],
         in registry: ToolRegistry
-    ) throws -> [AgentToolIdentifier] {
+    ) throws -> [ToolIdentifier] {
         switch policy {
         case .all:
             return []
@@ -148,15 +157,32 @@ public actor AgentToolExposure {
                     for: identifiers
                 )
 
-            var activated:
-                [AgentToolIdentifier] = []
+            return try activateKnownIdentifiers(
+                definitions.map(\.identifier)
+            )
+        }
+    }
 
-            for definition in definitions {
+    private func activateKnownIdentifiers(
+        _ identifiers: [ToolIdentifier]
+    ) throws -> [ToolIdentifier] {
+        switch policy {
+        case .all:
+            return []
+
+        case .explicit:
+            throw AgentToolExposureError
+                .activationNotAllowed
+
+        case .discoverable:
+            var activated: [ToolIdentifier] = []
+
+            for identifier in identifiers {
                 if activeIdentifiers.insert(
-                    definition.identifier
+                    identifier
                 ).inserted {
                     activated.append(
-                        definition.identifier
+                        identifier
                     )
                 }
             }
@@ -166,12 +192,12 @@ public actor AgentToolExposure {
     }
 
     public func parseModelCall(
-        _ call: AgentToolCall,
+        _ call: ToolCall,
         registry: ToolRegistry
     ) throws -> ParsedAgentToolCall {
         let identifier =
-            AgentToolIdentifier(
-                call.name
+            ToolIdentifier(
+                call.tool.rawValue
             )
 
         guard isExposed(
@@ -180,7 +206,7 @@ public actor AgentToolExposure {
         ) else {
             throw AgentToolExposureError
                 .toolNotExposed(
-                    call.name
+                    call.tool.rawValue
                 )
         }
 

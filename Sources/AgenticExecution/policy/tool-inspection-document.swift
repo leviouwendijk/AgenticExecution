@@ -1,3 +1,4 @@
+import Agentic
 import Foundation
 
 public struct ToolInspectionDocument: Sendable, Codable, Hashable {
@@ -97,7 +98,7 @@ private extension ToolPreflight {
         var items: [ToolInspectionItem] = [
             .field(
                 label: "tool",
-                value: overrideToolName ?? toolName
+                value: overrideToolName ?? tool.rawValue
             ),
             .field(
                 label: "risk",
@@ -109,7 +110,7 @@ private extension ToolPreflight {
             ),
             .field(
                 label: "preview",
-                value: isPreview ? "yes" : "no"
+                value: preview.isEmpty ? "no" : "yes"
             ),
         ]
 
@@ -141,39 +142,25 @@ private extension ToolPreflight {
     var accessSection: ToolInspectionSection? {
         var items: [ToolInspectionItem] = []
 
-        appendOptionalField(
-            label: "workspace root",
-            value: workspaceRoot,
-            to: &items
-        )
-
-        if workingDirectory != workspaceRoot {
-            appendOptionalField(
-                label: "working location",
-                value: workingDirectory,
-                to: &items
-            )
-        }
-
         appendList(
             label: "roots",
-            values: rootIDs,
+            values: access.roots,
             to: &items
         )
 
         appendList(
             label: "capabilities",
-            values: capabilitiesRequired.map(\.rawValue),
+            values: access.capabilities.map(\.rawValue),
             to: &items
         )
 
         appendList(
             label: "targets",
-            values: targetPaths,
+            values: access.targets,
             to: &items
         )
 
-        if includesHiddenPaths {
+        if access.includesHidden {
             items.append(
                 .field(
                     label: "hidden paths",
@@ -182,7 +169,7 @@ private extension ToolPreflight {
             )
         }
 
-        if followsSymlinks {
+        if access.followsSymlinks {
             items.append(
                 .field(
                     label: "symlinks",
@@ -206,91 +193,91 @@ private extension ToolPreflight {
 
         appendPositiveField(
             label: "writes",
-            value: estimatedWriteCount,
+            value: estimates.write.count,
             to: &items
         )
 
         appendOptionalField(
             label: "bytes",
-            value: estimatedByteCount,
+            value: estimates.bytes,
             to: &items
         )
 
         appendOptionalField(
             label: "seconds",
-            value: estimatedRuntimeSeconds,
+            value: estimates.runtime,
             to: &items
         )
 
         appendOptionalField(
             label: "scan entries",
-            value: estimatedScanEntries,
+            value: estimates.scan.entries,
             to: &items
         )
 
         appendOptionalField(
             label: "scan depth",
-            value: estimatedScanDepth,
+            value: estimates.scan.depth,
             to: &items
         )
 
         appendOptionalField(
             label: "read bytes",
-            value: estimatedReadBytes,
+            value: estimates.read.bytes,
             to: &items
         )
 
         appendOptionalField(
             label: "read lines",
-            value: estimatedReadLines,
+            value: estimates.read.lines,
             to: &items
         )
 
         appendOptionalField(
             label: "files read",
-            value: estimatedFileReadCount,
+            value: estimates.read.files,
             to: &items
         )
 
         appendOptionalField(
             label: "write bytes",
-            value: estimatedWriteBytes,
+            value: estimates.write.bytes,
             to: &items
         )
 
         appendOptionalField(
             label: "changed lines",
-            value: estimatedChangedLineCount,
+            value: estimates.write.changedLines,
             to: &items
         )
 
         appendOptionalField(
             label: "tool output bytes",
-            value: estimatedToolOutputBytes,
+            value: estimates.outputBytes,
             to: &items
         )
 
         appendOptionalField(
             label: "context bytes",
-            value: estimatedContextBytes,
+            value: estimates.context.bytes,
             to: &items
         )
 
         appendOptionalField(
             label: "context tokens",
-            value: estimatedContextTokens,
+            value: estimates.context.tokens,
             to: &items
         )
 
         appendOptionalField(
             label: "context files",
-            value: estimatedContextFiles,
+            value: estimates.context.files,
             to: &items
         )
 
         appendOptionalField(
             label: "largest source tokens",
-            value: estimatedLargestSourceTokens,
+            value: estimates.context.largestSourceTokens,
             to: &items
         )
 
@@ -309,21 +296,15 @@ private extension ToolPreflight {
 
         appendOptionalField(
             label: "command",
-            value: commandPreview,
+            value: preview.command,
             to: &items
         )
 
-        appendOptionalField(
-            label: "limit profile",
-            value: limitProfile,
-            to: &items
-        )
-
-        if let diffPreview {
+        if let difference = preview.difference {
             items.append(
                 .field(
                     label: "diff",
-                    value: "\(diffPreview.insertedLineCount) insertions, \(diffPreview.deletedLineCount) deletions, context \(diffPreview.contextLineCount)"
+                    value: "\(difference.layout.changes.insertions.count) insertions, \(difference.layout.changes.deletions.count) deletions"
                 )
             )
         }

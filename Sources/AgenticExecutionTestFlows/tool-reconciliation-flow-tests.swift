@@ -1,9 +1,9 @@
 import Agentic
 import AgenticExecution
-import AgenticRecovery
 import Primitives
 import Schema
 import TestFlows
+import Workspace
 
 extension AgenticExecutionFlowTesting {
     static func runToolReconciliation() async throws -> [TestFlowDiagnostic] {
@@ -16,7 +16,7 @@ extension AgenticExecutionFlowTesting {
 
         let output = try JSONToolBridge.decode(
             ToolReconciliationFixtureOutput.self,
-            from: result.output
+            from: result.result.output
         )
 
         try Expect.equal(
@@ -25,7 +25,7 @@ extension AgenticExecutionFlowTesting {
             "applied reconciliation preserves typed Output through registry erasure"
         )
         try Expect.equal(
-            result.isError,
+            result.result.isError,
             false,
             "applied reconciliation restores the normal successful tool result contract"
         )
@@ -134,29 +134,32 @@ private struct ToolReconciliationFixtureInput:
 private struct ToolReconciliationFixtureOutput:
     Sendable,
     Codable,
-    Hashable
+    Hashable,
+    JSONSchemaProviding
 {
     let value: String
+
+    static var jsonschema: JSONSchema {
+        .any
+    }
 }
 
-private struct ToolReconciliationFixture: AgentTool {
+private struct ToolReconciliationFixture: Tool {
     typealias Input = ToolReconciliationFixtureInput
     typealias Output = ToolReconciliationFixtureOutput
 
+    static let definition = ToolDefinition(
+        identifier: "tool_reconciliation_fixture",
+        purpose:
+            "Exercises typed tool reconciliation through registry erasure.",
+        risk: .boundedmutate
+    )
+
     let mode: ToolReconciliationFixtureMode
-
-    let identifier: AgentToolIdentifier =
-        "tool_reconciliation_fixture"
-
-    let description =
-        "Exercises typed tool reconciliation through registry erasure."
-
-    let risk: ActionRisk =
-        .boundedmutate
 
     func call(
         _ input: Input,
-        context _: AgentToolExecutionContext
+        workspace _: WorkspaceContext?
     ) async throws -> Output {
         _ = input
         throw ToolReconciliationFlowError.unexpectedCall
@@ -164,22 +167,18 @@ private struct ToolReconciliationFixture: AgentTool {
 
     func reconcile(
         _ input: Input,
-        after failure: AgentToolCallFailure,
-        context: AgentToolExecutionContext
-    ) async throws -> AgentToolReconciliation<Output>? {
+        after failure: ToolCall.Failure,
+        workspace _: WorkspaceContext?
+    ) async throws -> ToolCall.Reconciliation<Output>? {
         try Expect.equal(
             failure.phase,
             .call,
             "reconciliation receives the durable original call failure"
         )
-        let toolCallID = try Expect.notNil(
-            context.toolCallID,
-            "reconciliation receives a canonical tool call identity"
-        )
         try Expect.equal(
-            toolCallID,
             failure.toolCallID,
-            "reconciliation receives the canonical tool call identity"
+            "reconciliation-call",
+            "reconciliation receives canonical call identity in the failure envelope"
         )
 
         switch mode {
@@ -202,22 +201,21 @@ private struct ToolReconciliationFixture: AgentTool {
     }
 }
 
-private struct ToolReconciliationUnsupportedFixture: AgentTool {
+private struct ToolReconciliationUnsupportedFixture: Tool {
     typealias Input = ToolReconciliationFixtureInput
     typealias Output = ToolReconciliationFixtureOutput
 
-    let identifier: AgentToolIdentifier =
-        "tool_reconciliation_unsupported_fixture"
-
-    let description =
-        "Exercises the default unsupported reconciliation path."
-
-    let risk: ActionRisk =
-        .boundedmutate
+    static let definition = ToolDefinition(
+        identifier:
+            "tool_reconciliation_unsupported_fixture",
+        purpose:
+            "Exercises the default unsupported reconciliation path.",
+        risk: .boundedmutate
+    )
 
     func call(
         _ input: Input,
-        context _: AgentToolExecutionContext
+        workspace _: WorkspaceContext?
     ) async throws -> Output {
         Output(
             value: input.value
@@ -244,7 +242,7 @@ private func reconciliation(
             tool: tool.identifier,
             callID: call.id
         ),
-        context: .init()
+        workspace: nil
     )
 }
 
@@ -265,16 +263,18 @@ private func unsupportedReconciliation()
             tool: tool.identifier,
             callID: call.id
         ),
-        context: .init()
+        workspace: nil
     )
 }
 
 private func reconciliationCall(
     name: String
-) throws -> AgentToolCall {
-    AgentToolCall(
+) throws -> ToolCall {
+    ToolCall(
         id: "reconciliation-call",
-        name: name,
+        tool: ToolIdentifier(
+            rawValue: name
+        ),
         input: try JSONToolBridge.encode(
             ToolReconciliationFixtureInput(
                 value: "fixture"
@@ -284,9 +284,9 @@ private func reconciliationCall(
 }
 
 private func reconciliationFailure(
-    tool: AgentToolIdentifier,
+    tool: ToolIdentifier,
     callID: String
-) -> AgentToolCallFailure {
+) -> ToolCall.Failure {
     .init(
         tool: tool,
         toolCallID: callID,

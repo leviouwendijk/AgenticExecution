@@ -1,3 +1,5 @@
+import Agentic
+
 public protocol ToolApprovalHandler: Sendable {
     func decide(
         on preflight: ToolPreflight,

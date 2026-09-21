@@ -1,9 +1,9 @@
 import Agentic
 import AgenticExecution
-import AgenticWorkspace
 import Primitives
 import Schema
 import TestFlows
+import Workspace
 
 extension AgenticExecutionFlowTesting {
     static func runToolCallResolver() async throws -> [TestFlowDiagnostic] {
@@ -134,7 +134,7 @@ extension AgenticExecutionFlowTesting {
                 "resolver preserves unresolved human review for durable fallback"
             )
             try Expect.equal(
-                review.call.name,
+                review.call.tool.rawValue,
                 "resolver_mutate",
                 "resolver preserves the pending tool call"
             )
@@ -216,20 +216,45 @@ private struct ToolCallResolverProbeInput:
     }
 }
 
-private struct ToolCallResolverProbeTool:
-    AgentTool
+private protocol ToolCallResolverProbeIdentity {
+    static var definition: ToolDefinition { get }
+}
+
+private enum ResolverObserveToolIdentity:
+    ToolCallResolverProbeIdentity
 {
+    static let definition = ToolDefinition(
+        identifier: "resolver_observe",
+        purpose: "Observe resolver fixture.",
+        risk: .observe
+    )
+}
+
+private enum ResolverMutateToolIdentity:
+    ToolCallResolverProbeIdentity
+{
+    static let definition = ToolDefinition(
+        identifier: "resolver_mutate",
+        purpose: "Bounded mutation resolver fixture.",
+        risk: .boundedmutate
+    )
+}
+
+private struct ToolCallResolverProbeTool<
+    Identity: ToolCallResolverProbeIdentity
+>: Tool {
     typealias Input = ToolCallResolverProbeInput
     typealias Output = ToolCallResolverProbeInput
 
-    let identifier: AgentToolIdentifier
-    let description: String
-    let risk: ActionRisk
+    static var definition: ToolDefinition {
+        Identity.definition
+    }
+
     let probe: ToolCallResolverProbe
 
     func call(
         _ input: Input,
-        context _: AgentToolExecutionContext
+        workspace _: WorkspaceContext?
     ) async throws -> Output {
         await probe.recordInvocation()
         return input
@@ -261,18 +286,16 @@ private func toolCallResolverRegistry(
     var registry = ToolRegistry()
 
     try registry.register(
-        ToolCallResolverProbeTool(
-            identifier: "resolver_observe",
-            description: "Observe resolver fixture.",
-            risk: .observe,
+        ToolCallResolverProbeTool<
+            ResolverObserveToolIdentity
+        >(
             probe: probe
         )
     )
     try registry.register(
-        ToolCallResolverProbeTool(
-            identifier: "resolver_mutate",
-            description: "Bounded mutation resolver fixture.",
-            risk: .boundedmutate,
+        ToolCallResolverProbeTool<
+            ResolverMutateToolIdentity
+        >(
             probe: probe
         )
     )
@@ -283,10 +306,12 @@ private func toolCallResolverRegistry(
 private func toolCallResolverCall(
     id: String,
     name: String
-) throws -> AgentToolCall {
-    AgentToolCall(
+) throws -> ToolCall {
+    ToolCall(
         id: id,
-        name: name,
+        tool: ToolIdentifier(
+            rawValue: name
+        ),
         input: try JSONToolBridge.encode(
             ToolCallResolverProbeInput()
         )

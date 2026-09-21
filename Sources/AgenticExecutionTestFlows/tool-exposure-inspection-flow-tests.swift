@@ -1,6 +1,7 @@
 import Agentic
 import AgenticExecution
 import TestFlows
+import Workspace
 
 extension AgenticExecutionFlowTesting {
     static func runToolExposureInspection()
@@ -10,15 +11,15 @@ extension AgenticExecutionFlowTesting {
         var registry = ToolRegistry()
 
         try registry.register {
-            ExposureInspectionProbeTool(
-                identifier: "alpha"
-            )
-            ExposureInspectionProbeTool(
-                identifier: "beta"
-            )
-            ExposureInspectionProbeTool(
-                identifier: "gamma"
-            )
+            ExposureInspectionProbeTool<
+                ExposureAlphaIdentity
+            >()
+            ExposureInspectionProbeTool<
+                ExposureBetaIdentity
+            >()
+            ExposureInspectionProbeTool<
+                ExposureGammaIdentity
+            >()
         }
 
         let exposure = AgentToolExposure(
@@ -86,22 +87,21 @@ extension AgenticExecutionFlowTesting {
         )
 
         let result = try await registry.execute(
-            AgentToolCall(
+            ToolCall(
                 id: "inspect-tool-exposure-flow",
-                name:
+                tool:
                     InspectToolExposureTool
-                        .identifier
-                        .rawValue,
+                        .identifier,
                 input: try JSONToolBridge.encode(
                     InspectToolExposureToolInput()
                 )
             ),
-            context: .init()
+            workspace: nil
         )
 
         let output = try JSONToolBridge.decode(
             InspectToolExposureToolOutput.self,
-            from: result.output
+            from: result.result.output
         )
 
         try Expect.equal(
@@ -128,29 +128,50 @@ extension AgenticExecutionFlowTesting {
     }
 }
 
-private struct ExposureInspectionProbeTool:
-    AgentTool
+private protocol ExposureInspectionProbeIdentity {
+    static var identifier: ToolIdentifier { get }
+}
+
+private enum ExposureAlphaIdentity:
+    ExposureInspectionProbeIdentity
 {
+    static let identifier:
+        ToolIdentifier = "alpha"
+}
+
+private enum ExposureBetaIdentity:
+    ExposureInspectionProbeIdentity
+{
+    static let identifier:
+        ToolIdentifier = "beta"
+}
+
+private enum ExposureGammaIdentity:
+    ExposureInspectionProbeIdentity
+{
+    static let identifier:
+        ToolIdentifier = "gamma"
+}
+
+private struct ExposureInspectionProbeTool<
+    Identity: ExposureInspectionProbeIdentity
+>: Tool {
     typealias Input =
         InspectToolExposureToolInput
     typealias Output =
         InspectToolExposureToolInput
 
-    let identifier: AgentToolIdentifier
-    let description: String
-    let risk: ActionRisk = .observe
-
-    init(
-        identifier: AgentToolIdentifier
-    ) {
-        self.identifier = identifier
-        self.description =
-            "Exposure inspection probe."
+    static var definition: ToolDefinition {
+        .init(
+            identifier: Identity.identifier,
+            purpose: "Exposure inspection probe.",
+            risk: .observe
+        )
     }
 
     func call(
         _ input: Input,
-        context _: AgentToolExecutionContext
+        workspace _: WorkspaceContext?
     ) async throws -> Output {
         input
     }

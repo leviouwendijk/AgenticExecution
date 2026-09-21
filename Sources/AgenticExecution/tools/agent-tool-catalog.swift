@@ -13,7 +13,7 @@ public enum AgentToolOrigin:
 public struct AgentToolCatalogEntry:
     Sendable
 {
-    public let identifier: AgentToolIdentifier
+    public let identifier: ToolIdentifier
     public let title: String
     public let description: String
     public let risk: ActionRisk
@@ -26,7 +26,7 @@ public struct AgentToolCatalogEntry:
     public let defaultExposure: AgentToolDefaultExposure
 
     public init(
-        identifier: AgentToolIdentifier,
+        identifier: ToolIdentifier,
         title: String,
         description: String,
         risk: ActionRisk,
@@ -56,13 +56,13 @@ public struct AgentToolCollection:
     public let identifier: AgentToolCollectionIdentifier
     public let title: String
     public let defaultExposure: AgentToolDefaultExposure
-    public let toolIdentifiers: [AgentToolIdentifier]
+    public let toolIdentifiers: [ToolIdentifier]
 
     public init(
         identifier: AgentToolCollectionIdentifier,
         title: String,
         defaultExposure: AgentToolDefaultExposure,
-        toolIdentifiers: [AgentToolIdentifier]
+        toolIdentifiers: [ToolIdentifier]
     ) {
         self.identifier = identifier
         self.title = title
@@ -79,10 +79,10 @@ public enum AgentToolCatalogError:
         AgentToolCollectionIdentifier
     )
     case toolAssignedToMultipleCollections(
-        AgentToolIdentifier
+        ToolIdentifier
     )
     case registeredToolMissingFromCompletedRegistry(
-        AgentToolIdentifier
+        ToolIdentifier
     )
 }
 
@@ -107,7 +107,7 @@ public struct AgentToolCatalog:
     }
 
     public var defaultExposedIdentifiers:
-        [AgentToolIdentifier]
+        [ToolIdentifier]
     {
         entries.compactMap { entry in
             guard entry.isModelFacing,
@@ -129,7 +129,7 @@ public struct AgentToolCatalog:
     }
 
     public func entry(
-        identifiedBy identifier: AgentToolIdentifier
+        identifiedBy identifier: ToolIdentifier
     ) -> AgentToolCatalogEntry? {
         entries.first { entry in
             entry.identifier == identifier
@@ -184,7 +184,7 @@ public struct AgentToolCatalog:
         )
 
         var claimedIdentifiers:
-            Set<AgentToolIdentifier> = []
+            Set<ToolIdentifier> = []
         var collections: [AgentToolCollection] = []
         var entries: [AgentToolCatalogEntry] = []
 

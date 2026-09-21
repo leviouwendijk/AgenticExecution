@@ -22,19 +22,19 @@ public struct AgentToolPlanRecord:
     Identifiable
 {
     public let path: String
-    public let call: AgentToolCall
+    public let call: ToolCall
     public let outcome: AgentToolPlanOutcome
     public let invocation: ToolInvocation.Result?
-    public let toolFailure: AgentToolCallFailure?
+    public let toolFailure: ToolCall.Failure?
     public let errorDescription: String?
     public let skipReason: String?
 
     public init(
         path: String,
-        call: AgentToolCall,
+        call: ToolCall,
         outcome: AgentToolPlanOutcome,
         invocation: ToolInvocation.Result? = nil,
-        toolFailure: AgentToolCallFailure? = nil,
+        toolFailure: ToolCall.Failure? = nil,
         errorDescription: String? = nil,
         skipReason: String? = nil
     ) {

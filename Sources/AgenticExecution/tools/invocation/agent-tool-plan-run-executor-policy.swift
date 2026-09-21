@@ -1,13 +1,15 @@
 import Agentic
 import Foundation
+import Workspace
 
 public extension AgentToolPlanRunExecutor {
     func start(
-        _ plan: AgentToolPlan,
+        _ plan: ToolPlan,
         runID: String = UUID().uuidString,
         relationship: AgentToolPlanRunRelationship = .root,
         executionPolicy: AgentToolPlanExecutionPolicy,
-        context: AgentToolExecutionContext = .init(),
+        workspace: WorkspaceContext? = nil,
+        guidelineRelations: [AgentGuidelineRelation] = [],
         approvalHandler: (any ToolApprovalHandler)? = nil
     ) async throws -> AgentToolPlanRun {
         switch executionPolicy {
@@ -16,7 +18,8 @@ public extension AgentToolPlanRunExecutor {
                 plan,
                 runID: runID,
                 relationship: relationship,
-                context: context,
+                workspace: workspace,
+                guidelineRelations: guidelineRelations,
                 approvalHandler: approvalHandler
             )
 
@@ -25,7 +28,8 @@ public extension AgentToolPlanRunExecutor {
                 plan,
                 runID: runID,
                 relationship: relationship,
-                context: context,
+                workspace: workspace,
+                guidelineRelations: guidelineRelations,
                 approvalHandler: approvalHandler
             )
         }
@@ -34,7 +38,8 @@ public extension AgentToolPlanRunExecutor {
     func resume(
         _ run: AgentToolPlanRun,
         executionPolicy: AgentToolPlanExecutionPolicy,
-        context: AgentToolExecutionContext = .init(),
+        workspace: WorkspaceContext? = nil,
+        guidelineRelations: [AgentGuidelineRelation] = [],
         approvalHandler: (any ToolApprovalHandler)? = nil
     ) async throws -> AgentToolPlanRun {
         guard case .paused(let pause) = run.state else {
@@ -49,7 +54,8 @@ public extension AgentToolPlanRunExecutor {
                 current = try await resume(
                     current,
                     executionPolicy: .single_step,
-                    context: context,
+                    workspace: workspace,
+                    guidelineRelations: guidelineRelations,
                     approvalHandler: approvalHandler
                 )
             }
@@ -60,7 +66,8 @@ public extension AgentToolPlanRunExecutor {
             return try await resumePausedSingleStep(
                 run,
                 pause: pause,
-                context: context,
+                workspace: workspace,
+                guidelineRelations: guidelineRelations,
                 approvalHandler: approvalHandler
             )
         }
@@ -69,14 +76,13 @@ public extension AgentToolPlanRunExecutor {
 
 private extension AgentToolPlanRunExecutor {
     func startSingleStep(
-        _ plan: AgentToolPlan,
+        _ plan: ToolPlan,
         runID: String,
         relationship: AgentToolPlanRunRelationship,
-        context: AgentToolExecutionContext,
+        workspace: WorkspaceContext?,
+        guidelineRelations: [AgentGuidelineRelation],
         approvalHandler: (any ToolApprovalHandler)?
     ) async throws -> AgentToolPlanRun {
-        try plan.validate()
-
         let initialTraversal = plan.root.singleStepTraversal(
             path: "root",
             outcomesByPath: [:]
@@ -87,22 +93,24 @@ private extension AgentToolPlanRunExecutor {
                 plan,
                 runID: runID,
                 relationship: relationship,
-                context: context,
+                workspace: workspace,
+                guidelineRelations: guidelineRelations,
                 approvalHandler: approvalHandler
             )
         }
 
         let attemptNumber = 1
-        let isolatedPlan = AgentToolPlan(
+        let isolatedPlan = try ToolPlan(
             id: "\(plan.id).single-step.\(attemptNumber)",
             root: step.node,
-            guidelineRelations: plan.guidelineRelations
+            guidelines: plan.guidelines
         )
         let isolatedRun = try await start(
             isolatedPlan,
             runID: "\(runID).single-step.\(attemptNumber)",
             relationship: relationship,
-            context: context,
+            workspace: workspace,
+            guidelineRelations: guidelineRelations,
             approvalHandler: approvalHandler
         )
 
@@ -202,7 +210,8 @@ private extension AgentToolPlanRunExecutor {
     func resumePausedSingleStep(
         _ run: AgentToolPlanRun,
         pause: AgentToolPlanPause,
-        context: AgentToolExecutionContext,
+        workspace: WorkspaceContext?,
+        guidelineRelations: [AgentGuidelineRelation],
         approvalHandler: (any ToolApprovalHandler)?
     ) async throws -> AgentToolPlanRun {
         let outcomesByPath =
@@ -257,16 +266,17 @@ private extension AgentToolPlanRunExecutor {
             )
         }
         let attemptNumber = run.attempts.count + 1
-        let isolatedPlan = AgentToolPlan(
+        let isolatedPlan = try ToolPlan(
             id: "\(run.plan.id).single-step.\(attemptNumber)",
             root: step.node,
-            guidelineRelations: run.plan.guidelineRelations
+            guidelines: run.plan.guidelines
         )
         let isolatedRun = try await start(
             isolatedPlan,
             runID: "\(run.id).single-step.\(attemptNumber)",
             relationship: run.relationship,
-            context: context,
+            workspace: workspace,
+            guidelineRelations: guidelineRelations,
             approvalHandler: approvalHandler
         )
 
@@ -320,14 +330,16 @@ private extension AgentToolPlanRunExecutor {
     func resumePausedContinuously(
         _ run: AgentToolPlanRun,
         pause: AgentToolPlanPause,
-        context: AgentToolExecutionContext,
+        workspace: WorkspaceContext?,
+        guidelineRelations: [AgentGuidelineRelation],
         approvalHandler: (any ToolApprovalHandler)?
     ) async throws -> AgentToolPlanRun {
         try await resumeContinuation(
             run,
             afterPath: pause.afterPath,
             afterCallID: pause.afterCallID,
-            context: context,
+            workspace: workspace,
+            guidelineRelations: guidelineRelations,
             approvalHandler: approvalHandler
         )
     }
@@ -337,11 +349,11 @@ struct AgentToolPlanSingleStep:
     Sendable
 {
     let path: String
-    let call: AgentToolCall
-    let node: AgentToolPlanNode
+    let call: ToolCall
+    let node: ToolPlan.Node
 }
 
-private extension AgentToolPlanNode {
+private extension ToolPlan.Node {
     func serialSingleSteps(
         path: String
     ) throws -> [AgentToolPlanSingleStep] {

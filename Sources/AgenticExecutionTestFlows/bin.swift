@@ -336,19 +336,6 @@ enum AgenticExecutionFlowSuite: TestFlowRegistry {
                 .runToolReconciliation()
         },
         TestFlow(
-            "tool-policy-directives",
-            tags: [
-                "agentic-execution",
-                "policy",
-                "preflight",
-                "approval",
-                "escalation",
-            ]
-        ) {
-            try AgenticExecutionFlowTesting
-                .runToolPolicyDirectives()
-        },
-        TestFlow(
             "tool-registry-intrinsics",
             tags: [
                 "agentic-execution",

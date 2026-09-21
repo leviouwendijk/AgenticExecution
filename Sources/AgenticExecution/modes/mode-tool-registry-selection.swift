@@ -2,10 +2,10 @@ import Agentic
 
 public extension ToolRegistry {
     func selecting(
-        _ identifiers: [AgentToolIdentifier]
+        _ identifiers: [ToolIdentifier]
     ) throws -> ToolRegistry {
         var selected = ToolRegistry()
-        var seen = Set<AgentToolIdentifier>()
+        var seen = Set<ToolIdentifier>()
 
         for identifier in identifiers {
             guard seen.insert(identifier).inserted else {

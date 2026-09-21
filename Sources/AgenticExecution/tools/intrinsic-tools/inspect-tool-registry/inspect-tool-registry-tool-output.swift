@@ -1,12 +1,13 @@
 import Agentic
 import Primitives
+import Schema
 
 public struct InspectedAgentTool:
     Sendable,
     Codable,
     Hashable
 {
-    public let identifier: AgentToolIdentifier
+    public let identifier: ToolIdentifier
     public let description: String
     public let risk: ActionRisk
     public let modelFacing: Bool
@@ -16,7 +17,7 @@ public struct InspectedAgentTool:
     public let semanticInputSchema: JSONValue?
 
     public init(
-        identifier: AgentToolIdentifier,
+        identifier: ToolIdentifier,
         description: String,
         risk: ActionRisk,
         modelFacing: Bool,
@@ -38,7 +39,8 @@ public struct InspectedAgentTool:
 public struct InspectToolRegistryToolOutput:
     Sendable,
     Codable,
-    Hashable
+    Hashable,
+    JSONSchemaProviding
 {
     public let totalCount: Int
     public let returnedCount: Int
@@ -52,5 +54,9 @@ public struct InspectToolRegistryToolOutput:
         self.totalCount = totalCount
         self.returnedCount = returnedCount
         self.tools = tools
+    }
+
+    public static var jsonschema: JSONSchema {
+        .any
     }
 }

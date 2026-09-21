@@ -1,9 +1,9 @@
 import Agentic
-import AgenticWorkspace
+import Workspace
 
 /// Inspect the live model-visible tool surface for one executor.
 public struct InspectToolExposureTool:
-    AgentTool
+    Tool
 {
     public typealias Input =
         InspectToolExposureToolInput
@@ -11,7 +11,7 @@ public struct InspectToolExposureTool:
         InspectToolExposureToolOutput
 
     public static let identifier:
-        AgentToolIdentifier = "inspect_tool_exposure"
+        ToolIdentifier = "inspect_tool_exposure"
 
     public static let description =
         "Inspect the current model-visible Agentic tool exposure. Reports policy, registered/exposed/hidden counts, seeded identifiers, and dynamically activated identifiers without changing exposure. Hidden identifiers are omitted by default."
@@ -19,17 +19,11 @@ public struct InspectToolExposureTool:
     public static let risk:
         ActionRisk = .observe
 
-    public var identifier: AgentToolIdentifier {
-        Self.identifier
-    }
-
-    public var description: String {
-        Self.description
-    }
-
-    public var risk: ActionRisk {
-        Self.risk
-    }
+    public static let definition = ToolDefinition(
+        identifier: identifier,
+        purpose: description,
+        risk: risk
+    )
 
     public let source:
         AgentToolExposureInspectionSource
@@ -42,15 +36,13 @@ public struct InspectToolExposureTool:
 
     public func preflight(
         _ input: Input,
-        context: AgentToolExecutionContext
+        workspace _: WorkspaceContext?
     ) async throws -> ToolPreflight {
         _ = input
 
-        return ToolPreflight(
-            toolName: name,
-            risk: risk,
-            workspaceRoot:
-                context.workspace?.rootURL.path,
+        return .init(
+            tool: Self.definition.identifier,
+            risk: Self.definition.risk,
             summary:
                 "Inspect current model-visible tool exposure.",
             sideEffects: []
@@ -59,7 +51,7 @@ public struct InspectToolExposureTool:
 
     public func call(
         _ input: Input,
-        context _: AgentToolExecutionContext
+        workspace _: WorkspaceContext?
     ) async throws -> Output {
         .init(
             inspection: try await source.inspect(),

@@ -1,6 +1,7 @@
 import Agentic
 import AgenticExecution
 import TestFlows
+import Workspace
 
 extension AgenticExecutionFlowTesting {
     static func runToolCatalog()
@@ -13,9 +14,9 @@ extension AgenticExecutionFlowTesting {
                 title: "Core",
                 defaultExposure: .included
             ) {
-                ToolCatalogProbeTool(
-                    identifier: "catalog_core"
-                )
+                ToolCatalogProbeTool<
+                    CatalogCoreIdentity
+                >()
             }
 
             collection(
@@ -23,14 +24,14 @@ extension AgenticExecutionFlowTesting {
                 title: "Media",
                 defaultExposure: .excluded
             ) {
-                ToolCatalogProbeTool(
-                    identifier: "catalog_media"
-                )
+                ToolCatalogProbeTool<
+                    CatalogMediaIdentity
+                >()
             }
 
-            ToolCatalogProbeTool(
-                identifier: "catalog_legacy"
-            )
+            ToolCatalogProbeTool<
+                CatalogLegacyIdentity
+            >()
         }
 
         let registry = try Agentic.tool.registry {
@@ -105,7 +106,7 @@ extension AgenticExecutionFlowTesting {
         try Expect.equal(
             core.toolIdentifiers,
             [
-                AgentToolIdentifier(
+                ToolIdentifier(
                     "catalog_core"
                 ),
             ],
@@ -119,7 +120,7 @@ extension AgenticExecutionFlowTesting {
         try Expect.equal(
             media.toolIdentifiers,
             [
-                AgentToolIdentifier(
+                ToolIdentifier(
                     "catalog_media"
                 ),
             ],
@@ -128,7 +129,7 @@ extension AgenticExecutionFlowTesting {
         try Expect.equal(
             application.toolIdentifiers,
             [
-                AgentToolIdentifier(
+                ToolIdentifier(
                     "catalog_legacy"
                 ),
             ],
@@ -163,10 +164,10 @@ extension AgenticExecutionFlowTesting {
         try Expect.equal(
             catalog.defaultExposedIdentifiers,
             [
-                AgentToolIdentifier(
+                ToolIdentifier(
                     "catalog_core"
                 ),
-                AgentToolIdentifier(
+                ToolIdentifier(
                     "catalog_legacy"
                 ),
             ],
@@ -200,18 +201,18 @@ private func proveConflictingToolCollectionMetadataFails()
             "shared",
             title: "First"
         ) {
-            ToolCatalogProbeTool(
-                identifier: "catalog_conflict_a"
-            )
+            ToolCatalogProbeTool<
+                CatalogConflictAIdentity
+            >()
         }
 
         collection(
             "shared",
             title: "Second"
         ) {
-            ToolCatalogProbeTool(
-                identifier: "catalog_conflict_b"
-            )
+            ToolCatalogProbeTool<
+                CatalogConflictBIdentity
+            >()
         }
     }
 
@@ -240,27 +241,53 @@ private func proveConflictingToolCollectionMetadataFails()
     }
 }
 
-private struct ToolCatalogProbeTool:
-    AgentTool
-{
+private protocol ToolCatalogProbeIdentity {
+    static var identifier: ToolIdentifier { get }
+}
+
+private enum CatalogCoreIdentity: ToolCatalogProbeIdentity {
+    static let identifier:
+        ToolIdentifier = "catalog_core"
+}
+
+private enum CatalogMediaIdentity: ToolCatalogProbeIdentity {
+    static let identifier:
+        ToolIdentifier = "catalog_media"
+}
+
+private enum CatalogLegacyIdentity: ToolCatalogProbeIdentity {
+    static let identifier:
+        ToolIdentifier = "catalog_legacy"
+}
+
+private enum CatalogConflictAIdentity: ToolCatalogProbeIdentity {
+    static let identifier:
+        ToolIdentifier = "catalog_conflict_a"
+}
+
+private enum CatalogConflictBIdentity: ToolCatalogProbeIdentity {
+    static let identifier:
+        ToolIdentifier = "catalog_conflict_b"
+}
+
+private struct ToolCatalogProbeTool<
+    Identity: ToolCatalogProbeIdentity
+>: Tool {
     typealias Input = InspectToolRegistryToolInput
     typealias Output = InspectToolRegistryToolInput
 
-    let identifier: AgentToolIdentifier
-    let description: String
-    let risk: ActionRisk = .observe
-
-    init(
-        identifier: AgentToolIdentifier
-    ) {
-        self.identifier = identifier
-        self.description =
-            "Catalog probe for \(identifier.rawValue)."
+    static var definition: ToolDefinition {
+        .init(
+            identifier: Identity.identifier,
+            purpose:
+                "Catalog probe for \(Identity.identifier.rawValue).",
+            risk: .observe
+        )
     }
 
     func call(
         _ input: Input,
-        context _: AgentToolExecutionContext
+        workspace _: WorkspaceContext?
     ) async throws -> Output {
         input
     }

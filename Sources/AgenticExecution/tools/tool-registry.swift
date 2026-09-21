@@ -1,16 +1,16 @@
 import Agentic
-import AgenticWorkspace
+import Workspace
 import Primitives
 
-public struct ToolRegistry: Sendable {
+public struct ToolRegistry: Sendable, ToolAvailability {
     private var tools:
-        [AgentToolIdentifier: RegisteredAgentTool]
+        [ToolIdentifier: RegisteredAgentTool]
 
     public init() {
         self.tools = [:]
     }
 
-    public var definitions: [AgentToolDefinition] {
+    public var definitions: [ToolDescriptor] {
         tools.values
             .map(
                 \.capability.definition
@@ -20,7 +20,7 @@ public struct ToolRegistry: Sendable {
             }
     }
 
-    public var modelFacingDefinitions: [AgentToolDefinition] {
+    public var modelFacingDefinitions: [ToolDescriptor] {
         capabilities.compactMap { capability in
             guard capability.isModelFacing else {
                 return nil
@@ -31,8 +31,8 @@ public struct ToolRegistry: Sendable {
     }
 
     public func modelFacingDefinition(
-        identifiedBy identifier: AgentToolIdentifier
-    ) -> AgentToolDefinition? {
+        identifiedBy identifier: ToolIdentifier
+    ) -> ToolDescriptor? {
         guard let registered =
             registeredTool(
                 identifiedBy: identifier
@@ -46,12 +46,12 @@ public struct ToolRegistry: Sendable {
     }
 
     public func modelFacingDefinitions(
-        for identifiers: [AgentToolIdentifier]
-    ) throws -> [AgentToolDefinition] {
+        for identifiers: [ToolIdentifier]
+    ) throws -> [ToolDescriptor] {
         var seen:
-            Set<AgentToolIdentifier> = []
+            Set<ToolIdentifier> = []
         var definitions:
-            [AgentToolDefinition] = []
+            [ToolDescriptor] = []
 
         for identifier in identifiers {
             guard seen.insert(
@@ -101,11 +101,15 @@ public struct ToolRegistry: Sendable {
     }
 
     public mutating func register<T>(
-        _ tool: T
-    ) throws where T: AgentTool {
+        _ tool: T,
+        modelContract: AgentToolModelContract? = nil,
+        execution: AgentToolExecutionContract = .fixed
+    ) throws where T: Tool {
         try register(
             RegisteredAgentTool(
-                tool
+                tool,
+                modelContract: modelContract,
+                execution: execution
             )
         )
     }
@@ -126,14 +130,6 @@ public struct ToolRegistry: Sendable {
     }
 
     public mutating func register(
-        _ toolSet: any AgentToolSet
-    ) throws {
-        try toolSet.register(
-            into: &self
-        )
-    }
-
-    public mutating func register(
         from provider: any AgentToolProvider
     ) throws {
         try provider.registerTools(
@@ -142,7 +138,7 @@ public struct ToolRegistry: Sendable {
     }
 
     public func registeredTool(
-        identifiedBy identifier: AgentToolIdentifier
+        identifiedBy identifier: ToolIdentifier
     ) -> RegisteredAgentTool? {
         tools[identifier]
     }
@@ -159,16 +155,16 @@ public struct ToolRegistry: Sendable {
     }
 
     public func parseModelCall(
-        _ call: AgentToolCall
+        _ call: ToolCall
     ) throws -> ParsedAgentToolCall {
         guard let registered =
             registeredTool(
-                named: call.name
+                named: call.tool.rawValue
             )
         else {
             throw RegisteredAgentToolError
                 .invalidModelCall(
-                    tool: call.name,
+                    tool: call.tool.rawValue,
                     reason:
                         "No registered tool has this identifier."
                 )
@@ -181,46 +177,32 @@ public struct ToolRegistry: Sendable {
     }
 
     public func preflight(
-        _ toolCall: AgentToolCall,
-        workspace: AgentWorkspace? = nil
-    ) async throws -> ToolPreflight {
-        try await preflight(
-            toolCall,
-            context: .init(
-                workspace: workspace
-            )
-        )
-    }
-
-    public func preflight(
-        _ toolCall: AgentToolCall,
-        context: AgentToolExecutionContext
+        _ toolCall: ToolCall,
+        workspace: WorkspaceContext? = nil
     ) async throws -> ToolPreflight {
         guard let registered =
             registeredTool(
-                named: toolCall.name
+                named: toolCall.tool.rawValue
             )
         else {
-            throw ToolDispatchError.unknownTool(
-                toolCall.name
+            throw ToolRegistryExecutionError.missingTool(
+                toolCall.tool.rawValue
             )
         }
 
         return try await registered.preflight(
             toolCall,
-            context: context
+            workspace: workspace
         )
     }
 
     public func call(
-        _ toolCall: AgentToolCall,
-        workspace: AgentWorkspace?
-    ) async throws -> AgentToolResult {
+        _ toolCall: ToolCall,
+        workspace: WorkspaceContext?
+    ) async throws -> AgentToolExecutionResult {
         try await execute(
             toolCall,
-            context: .init(
-                workspace: workspace
-            )
+            workspace: workspace
         )
     }
 }

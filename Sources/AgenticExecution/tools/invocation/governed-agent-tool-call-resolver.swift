@@ -1,6 +1,6 @@
 import Agentic
-import AgenticRecovery
 import Primitives
+import Workspace
 
 public enum AgentToolCallResolutionError:
     Error,
@@ -8,19 +8,19 @@ public enum AgentToolCallResolutionError:
 {
     case needsHumanReview(ToolInvocation.Review)
     case missingToolResult(
-        call: AgentToolCall,
+        call: ToolCall,
         decision: ApprovalDecision
     )
 }
 
 public struct GovernedAgentToolCallResolver:
-    AgentToolCallResolver,
+    ToolCallResolver,
     Sendable
 {
     public let registry: ToolRegistry
     public let exposure: AgentToolExposure
     public let invoker: ToolInvoker
-    public let context: AgentToolExecutionContext
+    public let workspace: WorkspaceContext?
     public let approvalHandler: (any ToolApprovalHandler)?
     public let resolutionObserver:
         (@Sendable (ToolInvocation.Result) async -> Void)?
@@ -30,7 +30,7 @@ public struct GovernedAgentToolCallResolver:
         exposure: AgentToolExposure,
         policy: ToolExecutionPolicy,
         recovery: Recovery.Policy? = nil,
-        context: AgentToolExecutionContext = .init(),
+        workspace: WorkspaceContext? = nil,
         approvalHandler: (any ToolApprovalHandler)? = nil,
         resolutionObserver:
             (@Sendable (ToolInvocation.Result) async -> Void)? = nil
@@ -42,14 +42,14 @@ public struct GovernedAgentToolCallResolver:
             policy: policy,
             recovery: recovery
         )
-        self.context = context
+        self.workspace = workspace
         self.approvalHandler = approvalHandler
         self.resolutionObserver = resolutionObserver
     }
 
     public func resolve(
-        _ call: AgentToolCall
-    ) async throws -> AgentToolResult {
+        _ call: ToolCall
+    ) async throws -> ToolResult {
         let parsed = try await exposure.parseModelCall(
             call,
             registry: registry
@@ -57,9 +57,7 @@ public struct GovernedAgentToolCallResolver:
 
         let invocation = try await invoker.invoke(
             parsed.call,
-            context: context.withExecutionMode(
-                .model_tool_call
-            ),
+            workspace: workspace,
             approvalHandler: approvalHandler
         )
 
@@ -111,17 +109,17 @@ private extension GovernedAgentToolCallResolver {
     }
 
     func deniedResult(
-        for call: AgentToolCall,
+        for call: ToolCall,
         review: ToolInvocation.Review
-    ) throws -> AgentToolResult {
-        AgentToolResult(
+    ) throws -> ToolResult {
+        ToolResult(
             toolCallID: call.id,
-            name: call.name,
+            tool: call.tool,
             output: try JSONToolBridge.encode(
                 ResolutionPayload(
                     kind: "tool_denied",
                     toolCallID: call.id,
-                    toolName: call.name,
+                    toolName: call.tool.rawValue,
                     requirement: review.requirement.rawValue,
                     summary: review.preflight.summary
                 )
@@ -131,17 +129,17 @@ private extension GovernedAgentToolCallResolver {
     }
 
     func skippedResult(
-        for call: AgentToolCall,
+        for call: ToolCall,
         review: ToolInvocation.Review
-    ) throws -> AgentToolResult {
-        AgentToolResult(
+    ) throws -> ToolResult {
+        ToolResult(
             toolCallID: call.id,
-            name: call.name,
+            tool: call.tool,
             output: try JSONToolBridge.encode(
                 ResolutionPayload(
                     kind: "tool_skipped",
                     toolCallID: call.id,
-                    toolName: call.name,
+                    toolName: call.tool.rawValue,
                     requirement: review.requirement.rawValue,
                     summary: "Skipped explicitly by the operator."
                 )

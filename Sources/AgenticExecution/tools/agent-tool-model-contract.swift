@@ -1,6 +1,6 @@
 import Schema
 
-/// Model-facing registration state captured when an AgentTool enters ToolRegistry.
+/// Model-facing registration state captured when a canonical Tool enters ToolRegistry.
 public enum AgentToolModelContract: Sendable {
     case modelFacing(
         inputSchema: JSONSchema

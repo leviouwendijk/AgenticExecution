@@ -1,5 +1,6 @@
 import Agentic
 import Foundation
+import Primitives
 
 public struct PreparedIntent: Sendable, Codable, Hashable, Identifiable {
     public let id: PreparedIntentIdentifier

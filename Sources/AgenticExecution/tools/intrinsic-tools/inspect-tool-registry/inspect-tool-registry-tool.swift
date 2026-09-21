@@ -1,12 +1,12 @@
 import Agentic
-import AgenticWorkspace
+import Workspace
 import Foundation
 import Primitives
 import Schema
 
 /// Intrinsic model-facing projection of the declared tool registry captured at bootstrap.
 public struct InspectToolRegistryTool:
-    AgentTool
+    Tool
 {
     public typealias Input =
         InspectToolRegistryToolInput
@@ -14,7 +14,7 @@ public struct InspectToolRegistryTool:
         InspectToolRegistryToolOutput
 
     public static let identifier:
-        AgentToolIdentifier = "inspect_tool_registry"
+        ToolIdentifier = "inspect_tool_registry"
 
     public static let description =
         "Inspect the declared Agentic tool registry captured before intrinsic tools are installed. Lists registered capabilities or reads one exact identifier, with optional semantic input schemas. This does not report or change current model-visible tool exposure."
@@ -22,17 +22,11 @@ public struct InspectToolRegistryTool:
     public static let risk:
         ActionRisk = .observe
 
-    public var identifier: AgentToolIdentifier {
-        Self.identifier
-    }
-
-    public var description: String {
-        Self.description
-    }
-
-    public var risk: ActionRisk {
-        Self.risk
-    }
+    public static let definition = ToolDefinition(
+        identifier: identifier,
+        purpose: description,
+        risk: risk
+    )
 
     public let inspection:
         AgentToolRegistryInspection
@@ -45,17 +39,15 @@ public struct InspectToolRegistryTool:
 
     public func preflight(
         _ input: Input,
-        context: AgentToolExecutionContext
+        workspace _: WorkspaceContext?
     ) async throws -> ToolPreflight {
         let identifier = normalizedIdentifier(
             input.identifier
         )
 
-        return ToolPreflight(
-            toolName: name,
-            risk: risk,
-            workspaceRoot:
-                context.workspace?.rootURL.path,
+        return .init(
+            tool: Self.definition.identifier,
+            risk: Self.definition.risk,
             summary:
                 identifier.map {
                     "Inspect declared registered tool '\($0)' without changing model exposure."
@@ -67,7 +59,7 @@ public struct InspectToolRegistryTool:
 
     public func call(
         _ input: Input,
-        context _: AgentToolExecutionContext
+        workspace _: WorkspaceContext?
     ) async throws -> Output {
         let entries:
             [AgentToolRegistryInspectionEntry]

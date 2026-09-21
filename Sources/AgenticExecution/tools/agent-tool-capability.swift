@@ -5,12 +5,12 @@ import Schema
 public struct AgentToolCapability:
     Sendable
 {
-    public let definition: AgentToolDefinition
+    public let definition: ToolDescriptor
     public let modelContract: AgentToolModelContract
     public let execution: AgentToolExecutionContract
 
     public init(
-        definition: AgentToolDefinition,
+        definition: ToolDescriptor,
         modelContract: AgentToolModelContract,
         execution: AgentToolExecutionContract
     ) {

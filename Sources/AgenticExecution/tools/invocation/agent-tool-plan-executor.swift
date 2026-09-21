@@ -1,5 +1,6 @@
 import Agentic
 import Foundation
+import Workspace
 
 public struct AgentToolPlanExecutor:
     Sendable
@@ -13,20 +14,24 @@ public struct AgentToolPlanExecutor:
     }
 
     public func execute(
-        _ plan: AgentToolPlan,
-        context: AgentToolExecutionContext = .init(),
+        _ plan: ToolPlan,
+        workspace: WorkspaceContext? = nil,
+        guidelineRelations: [AgentGuidelineRelation] = [],
         approvalHandler: (any ToolApprovalHandler)? = nil
     ) async throws -> AgentToolPlanResult {
-        try plan.validate()
+        var guidelineRelations = guidelineRelations
 
-        let context = context.appendingGuidelineRelations(
-            plan.guidelineRelations
-        )
+        for relation in plan.guidelines
+        where !guidelineRelations.contains(relation)
+        {
+            guidelineRelations.append(relation)
+        }
 
         let execution = await execute(
             plan.root,
             path: "root",
-            context: context,
+            workspace: workspace,
+            guidelineRelations: guidelineRelations,
             approvalHandler: approvalHandler
         )
 
@@ -47,9 +52,10 @@ private extension AgentToolPlanExecutor {
     }
 
     func execute(
-        _ node: AgentToolPlanNode,
+        _ node: ToolPlan.Node,
         path: String,
-        context: AgentToolExecutionContext,
+        workspace: WorkspaceContext?,
+        guidelineRelations: [AgentGuidelineRelation],
         approvalHandler: (any ToolApprovalHandler)?
     ) async -> NodeExecution {
         switch node.kind {
@@ -57,7 +63,8 @@ private extension AgentToolPlanExecutor {
             return await executeCall(
                 node,
                 path: path,
-                context: context,
+                workspace: workspace,
+                guidelineRelations: guidelineRelations,
                 approvalHandler: approvalHandler
             )
 
@@ -65,7 +72,8 @@ private extension AgentToolPlanExecutor {
             return await executeSequence(
                 node.children,
                 path: path,
-                context: context,
+                workspace: workspace,
+                guidelineRelations: guidelineRelations,
                 approvalHandler: approvalHandler
             )
 
@@ -73,16 +81,18 @@ private extension AgentToolPlanExecutor {
             return await executeBatch(
                 node.children,
                 path: path,
-                context: context,
+                workspace: workspace,
+                guidelineRelations: guidelineRelations,
                 approvalHandler: approvalHandler
             )
         }
     }
 
     func executeCall(
-        _ node: AgentToolPlanNode,
+        _ node: ToolPlan.Node,
         path: String,
-        context: AgentToolExecutionContext,
+        workspace: WorkspaceContext?,
+        guidelineRelations: [AgentGuidelineRelation],
         approvalHandler: (any ToolApprovalHandler)?
     ) async -> NodeExecution {
         guard let call = node.call else {
@@ -105,7 +115,8 @@ private extension AgentToolPlanExecutor {
             invocation = try await invoker.invoke(
                 call,
                 execution: execution,
-                context: context,
+                workspace: workspace,
+                guidelineRelations: guidelineRelations,
                 approvalHandler: approvalHandler
             )
         } catch {
@@ -114,7 +125,7 @@ private extension AgentToolPlanExecutor {
                 call: call,
                 outcome: .failed,
                 toolFailure:
-                    (error as? AgentToolCallError)?
+                    (error as? ToolCall.Error)?
                         .failure,
                 errorDescription: errorText(
                     error
@@ -125,7 +136,8 @@ private extension AgentToolPlanExecutor {
                 for: .failed,
                 node: node,
                 path: path,
-                context: context,
+                workspace: workspace,
+                guidelineRelations: guidelineRelations,
                 approvalHandler: approvalHandler
             )
 
@@ -157,7 +169,8 @@ private extension AgentToolPlanExecutor {
             for: outcome,
             node: node,
             path: path,
-            context: context,
+            workspace: workspace,
+            guidelineRelations: guidelineRelations,
             approvalHandler: approvalHandler
         )
 
@@ -193,10 +206,11 @@ private extension AgentToolPlanExecutor {
     }
 
     func executeSequence(
-        _ nodes: [AgentToolPlanNode],
+        _ nodes: [ToolPlan.Node],
         path: String,
         pathComponent: String? = "sequence",
-        context: AgentToolExecutionContext,
+        workspace: WorkspaceContext?,
+        guidelineRelations: [AgentGuidelineRelation],
         approvalHandler: (any ToolApprovalHandler)?
     ) async -> NodeExecution {
         var records: [AgentToolPlanRecord] = []
@@ -218,7 +232,8 @@ private extension AgentToolPlanExecutor {
             let child = await execute(
                 node,
                 path: childPath,
-                context: context,
+                workspace: workspace,
+                guidelineRelations: guidelineRelations,
                 approvalHandler: approvalHandler
             )
 
@@ -261,9 +276,10 @@ private extension AgentToolPlanExecutor {
     }
 
     func executeBatch(
-        _ nodes: [AgentToolPlanNode],
+        _ nodes: [ToolPlan.Node],
         path: String,
-        context: AgentToolExecutionContext,
+        workspace: WorkspaceContext?,
+        guidelineRelations: [AgentGuidelineRelation],
         approvalHandler: (any ToolApprovalHandler)?
     ) async -> NodeExecution {
         var records: [AgentToolPlanRecord] = []
@@ -279,7 +295,8 @@ private extension AgentToolPlanExecutor {
             let child = await execute(
                 node,
                 path: childPath,
-                context: context,
+                workspace: workspace,
+                guidelineRelations: guidelineRelations,
                 approvalHandler: approvalHandler
             )
 
@@ -319,16 +336,17 @@ private extension AgentToolPlanExecutor {
 
     func branchRecords(
         for outcome: AgentToolPlanOutcome,
-        node: AgentToolPlanNode,
+        node: ToolPlan.Node,
         path: String,
-        context: AgentToolExecutionContext,
+        workspace: WorkspaceContext?,
+        guidelineRelations: [AgentGuidelineRelation],
         approvalHandler: (any ToolApprovalHandler)?
     ) async -> (
         selectedOutcome: AgentToolPlanOutcome,
         records: [AgentToolPlanRecord]
     ) {
         let selectedLabel: String?
-        let selectedNodes: [AgentToolPlanNode]
+        let selectedNodes: [ToolPlan.Node]
 
         switch outcome {
         case .succeeded:
@@ -358,7 +376,8 @@ private extension AgentToolPlanExecutor {
                 selectedNodes,
                 path: "\(path).\(selectedLabel)",
                 pathComponent: nil,
-                context: context,
+                workspace: workspace,
+                guidelineRelations: guidelineRelations,
                 approvalHandler: approvalHandler
             )
 
@@ -372,7 +391,7 @@ private extension AgentToolPlanExecutor {
         let branches: [
             (
                 label: String,
-                nodes: [AgentToolPlanNode]
+                nodes: [ToolPlan.Node]
             )
         ] = [
             (
@@ -449,7 +468,7 @@ private extension AgentToolPlanExecutor {
     }
 
     func skippedRecords(
-        for node: AgentToolPlanNode,
+        for node: ToolPlan.Node,
         path: String,
         reason: String
     ) -> [AgentToolPlanRecord] {
@@ -513,7 +532,7 @@ private extension AgentToolPlanExecutor {
     }
 
     func skippedBranchRecords(
-        _ nodes: [AgentToolPlanNode],
+        _ nodes: [ToolPlan.Node],
         label: String,
         path: String,
         reason: String

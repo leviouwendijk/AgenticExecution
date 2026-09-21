@@ -70,7 +70,7 @@ enum AgentToolPlanSingleStepHistory {
     }
 }
 
-extension AgentToolPlanNode {
+extension ToolPlan.Node {
     func singleStepTraversal(
         path: String,
         outcomesByPath: [String: AgentToolPlanOutcome]
@@ -97,7 +97,7 @@ extension AgentToolPlanNode {
             }
 
             let selectedLabel: String?
-            let selectedNodes: [AgentToolPlanNode]
+            let selectedNodes: [ToolPlan.Node]
 
             switch outcome {
             case .succeeded:
@@ -193,7 +193,7 @@ extension AgentToolPlanNode {
     }
 
     private func singleStepSequenceTraversal(
-        _ children: [AgentToolPlanNode],
+        _ children: [ToolPlan.Node],
         path: String,
         pathComponent: String?,
         outcomesByPath: [String: AgentToolPlanOutcome]
