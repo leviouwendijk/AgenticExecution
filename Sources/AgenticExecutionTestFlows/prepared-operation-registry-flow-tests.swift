@@ -45,7 +45,7 @@ private struct PreparedOperationRegistryFixture:
 extension AgenticExecutionFlowTesting {
     static func runPreparedOperationRegistry()
         async throws
-        -> [TestFlowDiagnostic]
+        -> [TestDiagnostic]
     {
         let operation = PreparedOperationRegistryFixture()
         var registry = PreparedOperationRegistry()

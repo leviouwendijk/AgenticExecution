@@ -25,7 +25,7 @@ public extension AgentPreparedOperation {
     ) throws -> PreparedOperation.ResultEnvelope {
         .init(
             schema: schema,
-            result: try JSONValueCodec.encodeValue(
+            result: try JSONValue.encoding(
                 result
             )
         )
@@ -41,7 +41,7 @@ public extension AgentPreparedOperation {
             )
         }
 
-        return try envelope.result.as(
+        return try envelope.result.decode(
             Result.self
         )
     }

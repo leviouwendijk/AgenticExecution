@@ -6,7 +6,7 @@ import TestFlows
 import Workspace
 
 extension AgenticExecutionFlowTesting {
-    static func runToolMechanicalObserveRetry() async throws -> [TestFlowDiagnostic] {
+    static func runToolMechanicalObserveRetry() async throws -> [TestDiagnostic] {
         let execution = try await mechanicalRecoveryExecution(
             scenario: .observe_retry
         )
@@ -55,7 +55,7 @@ extension AgenticExecutionFlowTesting {
         ]
     }
 
-    static func runToolMechanicalMutationRecovery() async throws -> [TestFlowDiagnostic] {
+    static func runToolMechanicalMutationRecovery() async throws -> [TestDiagnostic] {
         let applied = try await mechanicalRecoveryExecution(
             scenario: .mutation_applied
         )
@@ -183,7 +183,7 @@ extension AgenticExecutionFlowTesting {
         ]
     }
 
-    static func runToolInvocationRecoveryEvidence() async throws -> [TestFlowDiagnostic] {
+    static func runToolInvocationRecoveryEvidence() async throws -> [TestDiagnostic] {
         let fixture = try mechanicalRecoveryFixture(
             scenario: .observe_retry
         )
@@ -250,7 +250,7 @@ extension AgenticExecutionFlowTesting {
         ]
     }
 
-    static func runToolPlanRecoveryEvidence() async throws -> [TestFlowDiagnostic] {
+    static func runToolPlanRecoveryEvidence() async throws -> [TestDiagnostic] {
         let fixture = try mechanicalRecoveryFixture(
             scenario: .observe_retry
         )

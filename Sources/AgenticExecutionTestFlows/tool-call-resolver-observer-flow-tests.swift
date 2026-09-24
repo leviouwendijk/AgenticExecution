@@ -8,7 +8,7 @@ import Workspace
 extension AgenticExecutionFlowTesting {
     static func runToolCallResolverObserver()
         async throws
-        -> [TestFlowDiagnostic]
+        -> [TestDiagnostic]
     {
         let probe = ToolCallResolverObserverProbe()
         let observer = ToolCallResolverObserverStore()

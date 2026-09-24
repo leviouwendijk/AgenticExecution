@@ -6,7 +6,7 @@ import Workspace
 extension AgenticExecutionFlowTesting {
     static func runToolExposureInspection()
         async throws
-        -> [TestFlowDiagnostic]
+        -> [TestDiagnostic]
     {
         var registry = ToolRegistry()
 

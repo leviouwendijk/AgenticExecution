@@ -46,7 +46,7 @@ private struct PreparedOperationFixture:
 extension AgenticExecutionFlowTesting {
     static func runPreparedOperationEnvelope()
         async throws
-        -> [TestFlowDiagnostic]
+        -> [TestDiagnostic]
     {
         let source = PreparedOperationFixture.Plan(
             value: "durable-plan"

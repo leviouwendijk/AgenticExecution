@@ -6,7 +6,7 @@ import Workspace
 extension AgenticExecutionFlowTesting {
     static func runToolRegistryIntrinsics()
         async throws
-        -> [TestFlowDiagnostic]
+        -> [TestDiagnostic]
     {
         let bare = ToolRegistry()
 

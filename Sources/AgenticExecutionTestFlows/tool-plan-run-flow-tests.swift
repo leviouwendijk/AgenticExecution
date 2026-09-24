@@ -7,7 +7,7 @@ import Foundation
 import Workspace
 
 enum AgenticExecutionFlowTesting {
-    static func runToolPlanExecutionPolicyModel() throws -> [TestFlowDiagnostic] {
+    static func runToolPlanExecutionPolicyModel() throws -> [TestDiagnostic] {
         let pause = AgentToolPlanPause(
             afterPath: "root.sequence[0]",
             afterCallID: "first",
@@ -49,7 +49,7 @@ enum AgenticExecutionFlowTesting {
         ]
     }
 
-    static func runToolPlanSingleStepStart() async throws -> [TestFlowDiagnostic] {
+    static func runToolPlanSingleStepStart() async throws -> [TestDiagnostic] {
         let fixture = try makeFixture()
         let run = try await fixture.executor.start(
             fixture.plan,
@@ -100,7 +100,7 @@ enum AgenticExecutionFlowTesting {
         ]
     }
 
-    static func runToolPlanSingleStepResume() async throws -> [TestFlowDiagnostic] {
+    static func runToolPlanSingleStepResume() async throws -> [TestDiagnostic] {
         let fixture = try makeFixture()
         let first = ToolCall(
             id: "first",
@@ -281,7 +281,7 @@ enum AgenticExecutionFlowTesting {
         ]
     }
 
-    static func runToolPlanRetryAndResume() async throws -> [TestFlowDiagnostic] {
+    static func runToolPlanRetryAndResume() async throws -> [TestDiagnostic] {
         let fixture = try makeFixture()
         let initial = try await fixture.executor.start(
             fixture.plan,
@@ -428,7 +428,7 @@ enum AgenticExecutionFlowTesting {
         ]
     }
 
-    static func runToolPlanFailureBranchRetryResume() async throws -> [TestFlowDiagnostic] {
+    static func runToolPlanFailureBranchRetryResume() async throws -> [TestDiagnostic] {
         let fixture = try makeFixture()
         let prefix = ToolCall(
             id: "failure-branch-prefix",
@@ -592,7 +592,7 @@ enum AgenticExecutionFlowTesting {
         ]
     }
 
-    static func runToolPlanSkipAndResume() async throws -> [TestFlowDiagnostic] {
+    static func runToolPlanSkipAndResume() async throws -> [TestDiagnostic] {
         let fixture = try makeFixture()
         let initial = try await fixture.executor.start(
             fixture.plan,
@@ -691,7 +691,7 @@ enum AgenticExecutionFlowTesting {
         ]
     }
 
-    static func runToolPlanApprovalSkip() async throws -> [TestFlowDiagnostic] {
+    static func runToolPlanApprovalSkip() async throws -> [TestDiagnostic] {
         let probe = PlanRunProbe()
         let tool = PlanRunProbeTool<
             PlanRunApprovalSkipIdentity

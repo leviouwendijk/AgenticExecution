@@ -1,5 +1,5 @@
 {
-  "originHash" : "12029b8561688a841a303b59da7d51b9a1db605dcae4e845ecd996bfc9949406",
+  "originHash" : "2a5ddee0175116b53fca1247fb08ce1b6704cbb7ea3b4ac5ab69e1f342e2d2d2",
   "pins" : [
     {
       "identity" : "agentic",
@@ -7,7 +7,7 @@
       "location" : "https://github.com/leviouwendijk/Agentic.git",
       "state" : {
         "branch" : "master",
-        "revision" : "4de34b185079547de8f18759bca95a4a584e5b01"
+        "revision" : "6052d7d4e519e7aebd5749fbdc31a0b738e57f30"
       }
     },
     {
@@ -26,6 +26,15 @@
       "state" : {
         "branch" : "master",
         "revision" : "d4ea1ad418c54380fde04cefacf5d59fa90054ba"
+      }
+    },
+    {
+      "identity" : "atomos",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/leviouwendijk/Atomos.git",
+      "state" : {
+        "branch" : "master",
+        "revision" : "06c6b3af18ebc4e8af671a0eca21d23d99664eef"
       }
     },
     {
@@ -124,7 +133,7 @@
       "location" : "https://github.com/leviouwendijk/Macros.git",
       "state" : {
         "branch" : "master",
-        "revision" : "581226ca30433e5adbe4244cf48cbe559a1aba88"
+        "revision" : "cfcf3c3595a90c52cce313a60cd42e04f245490f"
       }
     },
     {
@@ -178,7 +187,7 @@
       "location" : "https://github.com/leviouwendijk/Primitives.git",
       "state" : {
         "branch" : "master",
-        "revision" : "00079f74ba0b5a40598c1f8a7bb536306ec6c04e"
+        "revision" : "43d0c47686146a260187a32ba3fa3c920770ebcd"
       }
     },
     {
@@ -268,7 +277,16 @@
       "location" : "https://github.com/leviouwendijk/TestFlows.git",
       "state" : {
         "branch" : "master",
-        "revision" : "7d56906b4eb334be0ce3c43436772599260e6d1f"
+        "revision" : "be40ad2a6a45d56b0065cdf7754b9709ef960b09"
+      }
+    },
+    {
+      "identity" : "testing",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/leviouwendijk/Testing.git",
+      "state" : {
+        "branch" : "master",
+        "revision" : "105eecb68c3db99119dff3afeb846b7923abbc85"
       }
     },
     {

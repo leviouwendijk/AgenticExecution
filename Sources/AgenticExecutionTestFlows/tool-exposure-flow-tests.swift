@@ -6,7 +6,7 @@ import TestFlows
 import Workspace
 
 extension AgenticExecutionFlowTesting {
-    static func runToolExposureAll() async throws -> [TestFlowDiagnostic] {
+    static func runToolExposureAll() async throws -> [TestDiagnostic] {
         let registry = try toolExposureRegistry()
         let exposure = AgentToolExposure(
             policy: .all
@@ -53,7 +53,7 @@ extension AgenticExecutionFlowTesting {
         ]
     }
 
-    static func runToolExposureExplicit() async throws -> [TestFlowDiagnostic] {
+    static func runToolExposureExplicit() async throws -> [TestDiagnostic] {
         let registry = try toolExposureRegistry()
         let exposure = AgentToolExposure(
             policy: .explicit(
@@ -117,7 +117,7 @@ extension AgenticExecutionFlowTesting {
         ]
     }
 
-    static func runToolExposureDiscoverable() async throws -> [TestFlowDiagnostic] {
+    static func runToolExposureDiscoverable() async throws -> [TestDiagnostic] {
         let registry = try toolExposureRegistry()
         let exposure = AgentToolExposure(
             policy: .discoverable(
@@ -199,7 +199,7 @@ extension AgenticExecutionFlowTesting {
         ]
     }
 
-    static func runToolExposureRegistryPreservation() async throws -> [TestFlowDiagnostic] {
+    static func runToolExposureRegistryPreservation() async throws -> [TestDiagnostic] {
         let registry = try toolExposureRegistry()
         let exposure = AgentToolExposure(
             policy: .discoverable(

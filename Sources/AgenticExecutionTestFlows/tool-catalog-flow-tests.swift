@@ -6,7 +6,7 @@ import Workspace
 extension AgenticExecutionFlowTesting {
     static func runToolCatalog()
         async throws
-        -> [TestFlowDiagnostic]
+        -> [TestDiagnostic]
     {
         let registrations = tools {
             collection(

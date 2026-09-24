@@ -7,16 +7,20 @@ public enum JSONToolBridge {
         from value: JSONValue,
         decoder _: JSONDecoder = JSONDecoder()
     ) throws -> T {
-        try value.as(type)
+        try value.decode(type)
     }
 
     public static func encode<T: Encodable & Sendable>(
         _ value: T,
         encoder: JSONEncoder = JSONEncoder()
     ) throws -> JSONValue {
-        try JSONValueCodec.encodeValue(
+        try JSONValue.encoding(
             value,
-            using: encoder
+            using: JSONCoding(
+                encoder: {
+                    encoder
+                }
+            )
         )
     }
 }

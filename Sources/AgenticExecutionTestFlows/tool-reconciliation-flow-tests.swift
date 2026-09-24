@@ -6,7 +6,7 @@ import TestFlows
 import Workspace
 
 extension AgenticExecutionFlowTesting {
-    static func runToolReconciliation() async throws -> [TestFlowDiagnostic] {
+    static func runToolReconciliation() async throws -> [TestDiagnostic] {
         let applied = try await reconciliation(
             .applied
         )

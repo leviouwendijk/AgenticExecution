@@ -7,7 +7,7 @@ import TestFlows
 import Workspace
 
 extension AgenticExecutionFlowTesting {
-    static func runToolCallFailureEnvelope() async throws -> [TestFlowDiagnostic] {
+    static func runToolCallFailureEnvelope() async throws -> [TestDiagnostic] {
         try await provePhase(
             .decode,
             tool: PhaseFailureTool<PhaseFailureDecodeIdentity>(

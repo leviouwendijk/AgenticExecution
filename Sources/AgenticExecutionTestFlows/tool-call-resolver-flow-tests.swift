@@ -6,7 +6,7 @@ import TestFlows
 import Workspace
 
 extension AgenticExecutionFlowTesting {
-    static func runToolCallResolver() async throws -> [TestFlowDiagnostic] {
+    static func runToolCallResolver() async throws -> [TestDiagnostic] {
         let probe = ToolCallResolverProbe()
         let registry = try toolCallResolverRegistry(
             probe: probe

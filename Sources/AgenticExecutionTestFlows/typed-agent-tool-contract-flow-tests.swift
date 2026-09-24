@@ -7,7 +7,7 @@ import Schema
 import TestFlows
 
 extension AgenticExecutionFlowTesting {
-    static func runTypedAgentToolContract() async throws -> [TestFlowDiagnostic] {
+    static func runTypedAgentToolContract() async throws -> [TestDiagnostic] {
         let probe = TypedAgentToolContractProbe()
         let tool = TypedAgentToolContractTool(
             probe: probe

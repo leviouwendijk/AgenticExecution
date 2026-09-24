@@ -78,7 +78,7 @@ private actor PreparedIntentOperationStore:
 extension AgenticExecutionFlowTesting {
     static func runPreparedIntentOperationAuthority()
         async throws
-        -> [TestFlowDiagnostic]
+        -> [TestDiagnostic]
     {
         let operation = try PreparedIntentOperationFixture.envelope(
             .init(
