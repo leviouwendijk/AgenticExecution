@@ -8,43 +8,47 @@ import Workspace
 
 enum AgenticExecutionFlowTesting {
     static func runToolPlanExecutionPolicyModel() throws -> [TestDiagnostic] {
-        let pause = AgentToolPlanPause(
-            afterPath: "root.sequence[0]",
-            afterCallID: "first",
-            attemptNumber: 1,
-            reason: .single_step
+        let interruption = ToolPlan.Run.Interruption(
+            point: ToolPlan.Run.Point(
+                path: "root.sequence[0]",
+                callID: "first",
+                attemptNumber: 1
+            ),
+            reason: .policy(
+                .single_step
+            )
         )
-        let state = AgentToolPlanRunState.paused(
-            pause
+        let state = ToolPlan.Run.State.interrupted(
+            interruption
         )
 
-        guard AgentToolPlanExecutionPolicy.allCases == [
+        guard ToolPlan.ExecutionPolicy.allCases == [
             .continuous,
             .single_step,
         ] else {
             throw AgenticExecutionFlowError.unexpectedRunState
         }
 
-        guard case .paused(let captured) = state,
-              captured.afterPath == "root.sequence[0]",
-              captured.afterCallID == "first",
-              captured.attemptNumber == 1,
-              captured.reason == .single_step else {
+        guard case .interrupted(let captured) = state,
+              captured.point.path == "root.sequence[0]",
+              captured.point.callID == "first",
+              captured.point.attemptNumber == 1,
+              case .policy(.single_step) = captured.reason else {
             throw AgenticExecutionFlowError.unexpectedRunState
         }
 
         return [
             .field(
                 "continuous",
-                AgentToolPlanExecutionPolicy.continuous.rawValue
+                ToolPlan.ExecutionPolicy.continuous.rawValue
             ),
             .field(
                 "single-step",
-                AgentToolPlanExecutionPolicy.single_step.rawValue
+                ToolPlan.ExecutionPolicy.single_step.rawValue
             ),
             .field(
-                "pause",
-                captured.reason.rawValue
+                "interruption",
+                "single_step"
             ),
         ]
     }
@@ -57,11 +61,11 @@ enum AgenticExecutionFlowTesting {
             executionPolicy: .single_step
         )
 
-        guard case .paused(let pause) = run.state,
-              pause.afterPath == "root.sequence[0]",
-              pause.afterCallID == "prefix",
-              pause.attemptNumber == 1,
-              pause.reason == .single_step else {
+        guard case .interrupted(let interruption) = run.state,
+              interruption.point.path == "root.sequence[0]",
+              interruption.point.callID == "prefix",
+              interruption.point.attemptNumber == 1,
+              case .policy(.single_step) = interruption.reason else {
             throw AgenticExecutionFlowError.unexpectedRunState
         }
 
@@ -87,11 +91,11 @@ enum AgenticExecutionFlowTesting {
         return [
             .field(
                 "state",
-                "paused"
+                "interrupted"
             ),
             .field(
                 "after",
-                pause.afterCallID
+                interruption.point.callID
             ),
             .field(
                 "executed",
@@ -176,11 +180,11 @@ enum AgenticExecutionFlowTesting {
             executionPolicy: .single_step
         )
 
-        guard case .paused(let firstPause) = started.state,
-              firstPause.afterPath == "root.sequence[0]",
-              firstPause.afterCallID == "first",
-              firstPause.attemptNumber == 1,
-              firstPause.reason == .single_step else {
+        guard case .interrupted(let firstInterruption) = started.state,
+              firstInterruption.point.path == "root.sequence[0]",
+              firstInterruption.point.callID == "first",
+              firstInterruption.point.attemptNumber == 1,
+              case .policy(.single_step) = firstInterruption.reason else {
             throw AgenticExecutionFlowError.unexpectedRunState
         }
 
@@ -195,11 +199,11 @@ enum AgenticExecutionFlowTesting {
             executionPolicy: .single_step
         )
 
-        guard case .paused(let secondPause) = stepped.state,
-              secondPause.afterPath == "root.sequence[1]",
-              secondPause.afterCallID == "second",
-              secondPause.attemptNumber == 2,
-              secondPause.reason == .single_step else {
+        guard case .interrupted(let secondInterruption) = stepped.state,
+              secondInterruption.point.path == "root.sequence[1]",
+              secondInterruption.point.callID == "second",
+              secondInterruption.point.attemptNumber == 2,
+              case .policy(.single_step) = secondInterruption.reason else {
             throw AgenticExecutionFlowError.unexpectedRunState
         }
 
@@ -223,12 +227,12 @@ enum AgenticExecutionFlowTesting {
             throw AgenticExecutionFlowError.unexpectedRunState
         }
 
-        let completed = try await fixture.executor.resume(
+        let terminalRun = try await fixture.executor.resume(
             stepped,
             executionPolicy: .continuous
         )
 
-        guard case .completed = completed.state else {
+        guard case .terminal(.succeeded) = terminalRun.state else {
             throw AgenticExecutionFlowError.unexpectedRunState
         }
 
@@ -239,7 +243,7 @@ enum AgenticExecutionFlowTesting {
         )
 
         try Expect.equal(
-            completed.attempts.count,
+            terminalRun.attempts.count,
             4,
             "single-step traversal records one attempt per authored call"
         )
@@ -247,16 +251,16 @@ enum AgenticExecutionFlowTesting {
         guard case .node(
             path: "root.sequence[1].onSuccess[0]",
             callID: "third"
-        ) = completed.attempts[2].scope,
+        ) = terminalRun.attempts[2].scope,
               case .node(
                 path: "root.sequence[2].batch[0]",
                 callID: "fourth"
-              ) = completed.attempts[3].scope else {
+              ) = terminalRun.attempts[3].scope else {
             throw AgenticExecutionFlowError.unexpectedRunState
         }
 
         try Expect.equal(
-            completed.revision,
+            terminalRun.revision,
             4,
             "each authored execution boundary advances run revision"
         )
@@ -264,11 +268,11 @@ enum AgenticExecutionFlowTesting {
         return [
             .field(
                 "state",
-                "completed"
+                "terminal"
             ),
             .field(
                 "stepped-after",
-                secondPause.afterCallID
+                secondInterruption.point.callID
             ),
             .field(
                 "executed",
@@ -276,7 +280,7 @@ enum AgenticExecutionFlowTesting {
             ),
             .field(
                 "revision",
-                "\(completed.revision)"
+                "\(terminalRun.revision)"
             ),
         ]
     }
@@ -288,22 +292,22 @@ enum AgenticExecutionFlowTesting {
             runID: "retry-resume-run"
         )
 
-        guard case .suspended(let initialSuspension) = initial.state else {
+        guard case .interrupted(let initialInterruption) = initial.state else {
             throw AgenticExecutionFlowError.unexpectedRunState
         }
 
-        guard case .failure = initialSuspension.reason else {
-            throw AgenticExecutionFlowError.unexpectedSuspensionReason
+        guard case .failure = initialInterruption.reason else {
+            throw AgenticExecutionFlowError.unexpectedInterruptionReason
         }
 
         try Expect.equal(
-            initialSuspension.path,
+            initialInterruption.point.path,
             "root.sequence[1]",
             "initial failure path"
         )
 
         try Expect.equal(
-            initialSuspension.callID,
+            initialInterruption.point.callID,
             "repair",
             "initial failed call"
         )
@@ -318,12 +322,12 @@ enum AgenticExecutionFlowTesting {
             initial
         )
 
-        guard case .suspended(let retrySuspension) = retried.state else {
+        guard case .interrupted(let retryInterruption) = retried.state else {
             throw AgenticExecutionFlowError.unexpectedRunState
         }
 
-        guard case .continuation_required(let retryResolution) = retrySuspension.reason else {
-            throw AgenticExecutionFlowError.unexpectedSuspensionReason
+        guard case .continuation_required(let retryResolution) = retryInterruption.reason else {
+            throw AgenticExecutionFlowError.unexpectedInterruptionReason
         }
 
         guard case .retried(let resolvedAttemptNumber) = retryResolution.kind else {
@@ -370,7 +374,7 @@ enum AgenticExecutionFlowTesting {
             retried
         )
 
-        guard case .completed = resumed.state else {
+        guard case .terminal(.succeeded) = resumed.state else {
             throw AgenticExecutionFlowError.unexpectedRunState
         }
 
@@ -402,7 +406,7 @@ enum AgenticExecutionFlowTesting {
             resumed
         )
         let decoded = try JSONDecoder().decode(
-            AgentToolPlanRun.self,
+            ToolPlan.Run.self,
             from: encoded
         )
 
@@ -415,7 +419,7 @@ enum AgenticExecutionFlowTesting {
         return [
             .field(
                 "state",
-                "completed"
+                "terminal"
             ),
             .field(
                 "attempts",
@@ -424,6 +428,149 @@ enum AgenticExecutionFlowTesting {
             .field(
                 "revision",
                 "\(resumed.revision)"
+            ),
+        ]
+    }
+
+    static func runToolPlanFailureEvidence() async throws -> [TestDiagnostic] {
+        let fixture = try makeFailureEvidenceFixture(
+            retrySafety: .unsafe
+        )
+        let run = try await fixture.executor.start(
+            fixture.plan,
+            runID: "failure-evidence-run"
+        )
+
+        guard case .interrupted(let interruption) = run.state,
+              case .failure(let failure) = interruption.reason,
+              let toolFailure = failure.toolFailure,
+              let recovery = failure.recovery,
+              let errorDescription = failure.errorDescription,
+              !errorDescription.isEmpty else {
+            throw AgenticExecutionFlowError.unexpectedFailureEvidence
+        }
+
+        try Expect.equal(
+            interruption.point.path,
+            "root",
+            "failure interruption retains exact plan path"
+        )
+        try Expect.equal(
+            interruption.point.callID,
+            "failure-evidence",
+            "failure interruption retains exact call id"
+        )
+        try Expect.equal(
+            toolFailure.tool.rawValue,
+            "tool_plan_failure_evidence_probe",
+            "run failure retains typed tool identifier"
+        )
+        try Expect.equal(
+            toolFailure.toolCallID,
+            "failure-evidence",
+            "run failure retains typed tool call id"
+        )
+        try Expect.equal(
+            toolFailure.phase,
+            .call,
+            "run failure retains typed tool phase"
+        )
+        try Expect.equal(
+            recovery.state.effect,
+            .applied,
+            "run failure retains recovery effect state"
+        )
+        try Expect.equal(
+            recovery.state.retry,
+            .unsafe,
+            "run failure retains recovery retry safety"
+        )
+        try Expect.equal(
+            recovery.outcome,
+            .propagated,
+            "run failure retains propagated mechanical recovery evidence"
+        )
+        try Expect.equal(
+            await fixture.probe.invocationCount(),
+            1,
+            "failure evidence fixture executes exactly once"
+        )
+
+        return [
+            .field(
+                "state",
+                "interrupted"
+            ),
+            .field(
+                "phase",
+                toolFailure.phase.rawValue
+            ),
+            .field(
+                "recovery",
+                recovery.outcome.rawValue
+            ),
+            .field(
+                "retry-safety",
+                recovery.state.retry.rawValue
+            ),
+        ]
+    }
+
+    static func runToolPlanRetrySafety() async throws -> [TestDiagnostic] {
+        let retrySafeties: [Recovery.RetrySafety] = [
+            .requires_reconciliation,
+            .unsafe,
+        ]
+        var blocked: [String] = []
+
+        for retrySafety in retrySafeties {
+            let fixture = try makeFailureEvidenceFixture(
+                retrySafety: retrySafety
+            )
+            let run = try await fixture.executor.start(
+                fixture.plan,
+                runID: "retry-safety-\(retrySafety.rawValue)"
+            )
+
+            guard case .interrupted(let interruption) = run.state,
+                  case .failure(let failure) = interruption.reason,
+                  failure.recovery?.state.retry == retrySafety else {
+                throw AgenticExecutionFlowError.unexpectedFailureEvidence
+            }
+
+            do {
+                _ = try await fixture.executor.retry(
+                    run
+                )
+                throw AgenticExecutionFlowError.unexpectedRetry
+            } catch let error as ToolPlan.Run.Error {
+                guard case .retryNotSafe(let captured) = error,
+                      captured == retrySafety else {
+                    throw AgenticExecutionFlowError.unexpectedRetrySafety
+                }
+            }
+
+            try Expect.equal(
+                await fixture.probe.invocationCount(),
+                1,
+                "unsafe workflow retry must be rejected before tool replay"
+            )
+
+            blocked.append(
+                retrySafety.rawValue
+            )
+        }
+
+        return [
+            .field(
+                "blocked",
+                blocked.joined(
+                    separator: ","
+                )
+            ),
+            .field(
+                "replays",
+                "0"
             ),
         ]
     }
@@ -497,9 +644,9 @@ enum AgenticExecutionFlowTesting {
             runID: "failure-branch-retry-resume"
         )
 
-        guard case .suspended(let initialSuspension) = initial.state,
-              initialSuspension.path == "root.sequence[1]",
-              initialSuspension.callID == "failure-branch-repair",
+        guard case .interrupted(let initialInterruption) = initial.state,
+              initialInterruption.point.path == "root.sequence[1]",
+              initialInterruption.point.callID == "failure-branch-repair",
               let initialAttempt = initial.attempts.first else {
             throw AgenticExecutionFlowError.unexpectedRunState
         }
@@ -524,15 +671,15 @@ enum AgenticExecutionFlowTesting {
         try Expect.equal(
             await fixture.probe.invocationLog(),
             "prefix,repair,branch-fix",
-            "selected failure branch executes before parent suspension"
+            "selected failure branch executes before parent interruption"
         )
 
         let retried = try await fixture.executor.retry(
             initial
         )
 
-        guard case .suspended(let retrySuspension) = retried.state,
-              case .continuation_required(let resolution) = retrySuspension.reason else {
+        guard case .interrupted(let retryInterruption) = retried.state,
+              case .continuation_required(let resolution) = retryInterruption.reason else {
             throw AgenticExecutionFlowError.unexpectedRunState
         }
 
@@ -551,7 +698,7 @@ enum AgenticExecutionFlowTesting {
             retried
         )
 
-        guard case .completed = resumed.state else {
+        guard case .terminal(.succeeded) = resumed.state else {
             throw AgenticExecutionFlowError.unexpectedRunState
         }
 
@@ -599,7 +746,7 @@ enum AgenticExecutionFlowTesting {
             runID: "skip-resume-run"
         )
 
-        guard case .suspended = initial.state else {
+        guard case .interrupted = initial.state else {
             throw AgenticExecutionFlowError.unexpectedRunState
         }
 
@@ -607,12 +754,12 @@ enum AgenticExecutionFlowTesting {
             initial
         )
 
-        guard case .suspended(let skippedSuspension) = skipped.state else {
+        guard case .interrupted(let skippedInterruption) = skipped.state else {
             throw AgenticExecutionFlowError.unexpectedRunState
         }
 
-        guard case .continuation_required(let skipResolution) = skippedSuspension.reason else {
-            throw AgenticExecutionFlowError.unexpectedSuspensionReason
+        guard case .continuation_required(let skipResolution) = skippedInterruption.reason else {
+            throw AgenticExecutionFlowError.unexpectedInterruptionReason
         }
 
         guard case .skipped = skipResolution.kind else {
@@ -647,7 +794,7 @@ enum AgenticExecutionFlowTesting {
             skipped
         )
 
-        guard case .completed = resumed.state else {
+        guard case .terminal(.succeeded) = resumed.state else {
             throw AgenticExecutionFlowError.unexpectedRunState
         }
 
@@ -678,7 +825,7 @@ enum AgenticExecutionFlowTesting {
         return [
             .field(
                 "state",
-                "completed"
+                "terminal"
             ),
             .field(
                 "resolution",
@@ -706,7 +853,7 @@ enum AgenticExecutionFlowTesting {
                 autonomyMode: .auto_observe
             )
         )
-        let executor = AgentToolPlanRunExecutor(
+        let executor = ToolPlan.RunExecutor(
             invoker: invoker
         )
         let plan = try ToolPlan(
@@ -764,7 +911,7 @@ enum AgenticExecutionFlowTesting {
             )
         )
 
-        guard case .completed = run.state else {
+        guard case .terminal(.succeeded) = run.state else {
             throw AgenticExecutionFlowError.unexpectedRunState
         }
 
@@ -799,7 +946,7 @@ enum AgenticExecutionFlowTesting {
         return [
             .field(
                 "state",
-                "completed"
+                "terminal"
             ),
             .field(
                 "executed",
@@ -825,9 +972,142 @@ private struct SelectiveSkipApprovalHandler: ToolApprovalHandler {
     }
 }
 
+private actor PlanRunFailureEvidenceProbe {
+    private var invocations = 0
+
+    func invoke(
+        _ input: RunProbeInput
+    ) throws -> RunProbeInput {
+        invocations += 1
+        throw RunProbeError.failureEvidence
+    }
+
+    func invocationCount() -> Int {
+        invocations
+    }
+}
+
+private struct PlanRunFailureEvidenceTool: Tool {
+    typealias Input = RunProbeInput
+    typealias Output = RunProbeInput
+
+    static let definition = ToolDefinition(
+        identifier: "tool_plan_failure_evidence_probe",
+        purpose:
+            "Produces classified ToolPlan failure evidence for run hardening tests.",
+        risk: .observe
+    )
+
+    let probe: PlanRunFailureEvidenceProbe
+    let retrySafety: Recovery.RetrySafety
+
+    func call(
+        _ input: Input,
+        workspace _: WorkspaceContext?
+    ) async throws -> Output {
+        try await probe.invoke(
+            input
+        )
+    }
+
+    func classify(
+        _ error: any Error,
+        phase: ToolCall.Phase,
+        input _: Input?
+    ) -> Recovery.Incident? {
+        guard phase == .call,
+              error is RunProbeError else {
+            return nil
+        }
+
+        let kind: Recovery.Kind
+        let effectState: Recovery.EffectState
+
+        switch retrySafety {
+        case .safe:
+            kind = .transport_transient
+            effectState = .none
+
+        case .requires_reconciliation:
+            kind = .outcome_unknown
+            effectState = .unknown
+
+        case .unsafe:
+            kind = .invariant_violation
+            effectState = .applied
+        }
+
+        return Recovery.Incident(
+            kind: kind,
+            stage: .execution,
+            effectState: effectState,
+            retrySafety: retrySafety,
+            scope: .init(
+                kind: .tool,
+                identifier:
+                    Self.definition.identifier.rawValue
+            ),
+            message:
+                "Synthetic ToolPlan run failure evidence."
+        )
+    }
+}
+
+private extension AgenticExecutionFlowTesting {
+    struct FailureEvidenceFixture {
+        let executor: ToolPlan.RunExecutor
+        let plan: ToolPlan
+        let probe: PlanRunFailureEvidenceProbe
+    }
+
+    static func makeFailureEvidenceFixture(
+        retrySafety: Recovery.RetrySafety
+    ) throws -> FailureEvidenceFixture {
+        let probe = PlanRunFailureEvidenceProbe()
+        let tool = PlanRunFailureEvidenceTool(
+            probe: probe,
+            retrySafety: retrySafety
+        )
+        let invoker = ToolInvoker(
+            registry: try ToolRegistry {
+                tool
+            },
+            policy: ToolExecutionPolicy(
+                autonomyMode: .auto_observe
+            )
+        )
+        let call = ToolCall(
+            id: "failure-evidence",
+            tool: ToolIdentifier(
+                rawValue:
+                    "tool_plan_failure_evidence_probe"
+            ),
+            input: try JSONToolBridge.encode(
+                RunProbeInput(
+                    marker: retrySafety.rawValue
+                )
+            )
+        )
+        let plan = try ToolPlan(
+            id: "failure-evidence-plan",
+            root: .call(
+                call
+            )
+        )
+
+        return FailureEvidenceFixture(
+            executor: ToolPlan.RunExecutor(
+                invoker: invoker
+            ),
+            plan: plan,
+            probe: probe
+        )
+    }
+}
+
 private extension AgenticExecutionFlowTesting {
     struct Fixture {
-        let executor: AgentToolPlanRunExecutor
+        let executor: ToolPlan.RunExecutor
         let plan: ToolPlan
         let probe: PlanRunProbe
     }
@@ -892,7 +1172,7 @@ private extension AgenticExecutionFlowTesting {
         )
 
         return Fixture(
-            executor: AgentToolPlanRunExecutor(
+            executor: ToolPlan.RunExecutor(
                 invoker: invoker
             ),
             plan: plan,
@@ -997,10 +1277,14 @@ private struct RunProbeInput:
 
 private enum RunProbeError: Error {
     case firstRepairAttempt
+    case failureEvidence
 }
 
 private enum AgenticExecutionFlowError: Error {
     case unexpectedRunState
-    case unexpectedSuspensionReason
+    case unexpectedInterruptionReason
     case unexpectedResolution
+    case unexpectedFailureEvidence
+    case unexpectedRetry
+    case unexpectedRetrySafety
 }

@@ -295,7 +295,7 @@ extension AgenticExecutionFlowTesting {
         )
 
         let persisted = try JSONToolBridge.decode(
-            AgentToolPlanResult.self,
+            ToolPlan.Result.self,
             from: try JSONToolBridge.encode(
                 result
             )
@@ -331,17 +331,18 @@ extension AgenticExecutionFlowTesting {
 private extension AgenticExecutionFlowTesting {
     static func mechanicalRecoveryExecution(
         scenario: MechanicalRecoveryScenario
-    ) async throws -> AgentToolExecutionResult {
+    ) async throws -> ToolExecutionResult {
         let fixture = try mechanicalRecoveryFixture(
             scenario: scenario
         )
-        let review = try await fixture.invoker.review(
-            fixture.call
+        let invocation = try await fixture.invoker.invoke(
+            fixture.call,
+            approvalHandler: MechanicalRecoveryApprovalHandler()
         )
 
-        return try await fixture.invoker.executeApproved(
-            fixture.call,
-            preflight: review.preflight
+        return try Expect.notNil(
+            invocation.execution,
+            "mechanical recovery fixture executes through governed ToolInvoker path"
         )
     }
 
@@ -423,6 +424,17 @@ private extension AgenticExecutionFlowTesting {
                 ),
             ]
         )
+    }
+}
+
+private struct MechanicalRecoveryApprovalHandler:
+    ToolApprovalHandler
+{
+    func decide(
+        on review: ToolInvocation.Review
+    ) async throws -> ApprovalDecision {
+        _ = review
+        return .approved
     }
 }
 

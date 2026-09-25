@@ -6,7 +6,7 @@ import Agentic
 /// the exact durable tool-call failure when the terminal error result was produced
 /// from one. `recovery` preserves mechanical recovery and reconciliation evidence
 /// accumulated while executing the operation.
-public struct AgentToolExecutionResult:
+public struct ToolExecutionResult:
     Sendable,
     Codable,
     Hashable

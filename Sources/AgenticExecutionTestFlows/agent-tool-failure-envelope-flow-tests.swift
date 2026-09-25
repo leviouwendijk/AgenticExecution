@@ -225,14 +225,14 @@ private func proveToolPlanFailurePersistence() async throws {
             call
         )
     )
-    let run = try await AgentToolPlanRunExecutor(
+    let run = try await ToolPlan.RunExecutor(
         invoker: invoker
     ).start(
         plan,
         executionPolicy: .single_step
     )
     let persisted = try JSONDecoder().decode(
-        AgentToolPlanRun.self,
+        ToolPlan.Run.self,
         from: JSONEncoder().encode(
             run
         )

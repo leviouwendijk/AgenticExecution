@@ -5,10 +5,8 @@ import Version
 public enum PreparedIntentError: Error, Sendable, LocalizedError {
     case durableStorageRequired
     case intentNotFound(PreparedIntentIdentifier)
-    case emptyTitle
-    case emptySummary
     case emptyExecutionSummary
-    case alreadyTerminal(PreparedIntentIdentifier, PreparedIntentStatus)
+    case notReviewable(PreparedIntentIdentifier, PreparedIntentStatus)
     case expired(PreparedIntentIdentifier)
     case notApproved(PreparedIntentIdentifier, PreparedIntentStatus)
     case executionRecordIntentMismatch(
@@ -32,17 +30,11 @@ public enum PreparedIntentError: Error, Sendable, LocalizedError {
         case .intentNotFound(let id):
             return "No prepared intent exists for id '\(id.rawValue)'."
 
-        case .emptyTitle:
-            return "Prepared intent review title cannot be empty."
-
-        case .emptySummary:
-            return "Prepared intent review summary cannot be empty."
-
         case .emptyExecutionSummary:
             return "Prepared intent execution summary cannot be empty."
 
-        case .alreadyTerminal(let id, let status):
-            return "Prepared intent '\(id.rawValue)' is already terminal with status '\(status.rawValue)'."
+        case .notReviewable(let id, let status):
+            return "Prepared intent '\(id.rawValue)' cannot be reviewed while its status is '\(status.rawValue)'."
 
         case .expired(let id):
             return "Prepared intent '\(id.rawValue)' has expired."
@@ -61,4 +53,3 @@ public enum PreparedIntentError: Error, Sendable, LocalizedError {
         }
     }
 }
-

@@ -11,7 +11,7 @@ import Workspace
 /// existential afterward.
 public struct RegisteredAgentTool: Sendable {
     public enum Reconciliation: Sendable {
-        case applied(AgentToolExecutionResult)
+        case applied(ToolExecutionResult)
         case applied_without_output
         case not_applied
         case unknown
@@ -344,13 +344,13 @@ public struct RegisteredAgentTool: Sendable {
     public func execute(
         _ call: ToolCall,
         workspace: WorkspaceContext? = nil
-    ) async throws -> AgentToolExecutionResult {
+    ) async throws -> ToolExecutionResult {
         let execution = try await callHandler(
             call,
             workspace
         )
 
-        return AgentToolExecutionResult(
+        return ToolExecutionResult(
             result: ToolResult(
                 toolCallID: call.id,
                 tool: capability.definition.identifier,
@@ -388,7 +388,7 @@ public struct RegisteredAgentTool: Sendable {
         switch reconciliation {
         case .applied(let output, let projection):
             return .applied(
-                AgentToolExecutionResult(
+                ToolExecutionResult(
                     result: ToolResult(
                         toolCallID: call.id,
                         tool: capability.definition.identifier,
@@ -514,5 +514,3 @@ private func phasedToolCallError<T: Tool>(
         incident: incident
     )
 }
-
-

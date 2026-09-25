@@ -7,10 +7,6 @@ public enum AgentToolCallResolutionError:
     Sendable
 {
     case needsHumanReview(ToolInvocation.Review)
-    case missingToolResult(
-        call: ToolCall,
-        decision: ApprovalDecision
-    )
 }
 
 public struct GovernedAgentToolCallResolver:
@@ -65,18 +61,11 @@ public struct GovernedAgentToolCallResolver:
             invocation
         )
 
-        if let result = invocation.execution?.result {
-            return result
-        }
+        switch invocation.outcome {
+        case .executed(let execution):
+            return execution.result
 
-        switch invocation.decision {
-        case .approved:
-            throw AgentToolCallResolutionError.missingToolResult(
-                call: parsed.call,
-                decision: invocation.decision
-            )
-
-        case .needshuman:
+        case .interrupted(.human_review):
             throw AgentToolCallResolutionError.needsHumanReview(
                 invocation.review
             )

@@ -73,13 +73,43 @@ enum AgenticExecutionFlowSuite: TestFlowRegistry {
                 "agentic-execution",
                 "tool-plan",
                 "run",
-                "suspension",
+                "interruption",
                 "retry",
                 "resume",
             ]
         ) {
             try await AgenticExecutionFlowTesting
                 .runToolPlanRetryAndResume()
+        },
+        TestFlow(
+            "tool-plan-run-failure-evidence",
+            tags: [
+                "agentic-execution",
+                "tool-plan",
+                "run",
+                "failure",
+                "evidence",
+                "recovery",
+                "interruption",
+            ]
+        ) {
+            try await AgenticExecutionFlowTesting
+                .runToolPlanFailureEvidence()
+        },
+        TestFlow(
+            "tool-plan-run-retry-safety",
+            tags: [
+                "agentic-execution",
+                "tool-plan",
+                "run",
+                "recovery",
+                "retry",
+                "retry-safety",
+                "interruption",
+            ]
+        ) {
+            try await AgenticExecutionFlowTesting
+                .runToolPlanRetrySafety()
         },
         TestFlow(
             "tool-plan-failure-branch-retry-resume",
@@ -102,7 +132,7 @@ enum AgenticExecutionFlowSuite: TestFlowRegistry {
                 "agentic-execution",
                 "tool-plan",
                 "run",
-                "suspension",
+                "interruption",
                 "skip",
                 "resume",
             ]
@@ -116,7 +146,7 @@ enum AgenticExecutionFlowSuite: TestFlowRegistry {
                 "agentic-execution",
                 "tool-plan",
                 "execution-policy",
-                "pause",
+                "interruption",
             ]
         ) {
             try AgenticExecutionFlowTesting
@@ -129,7 +159,7 @@ enum AgenticExecutionFlowSuite: TestFlowRegistry {
                 "tool-plan",
                 "execution-policy",
                 "single-step",
-                "pause",
+                "interruption",
             ]
         ) {
             try await AgenticExecutionFlowTesting
@@ -144,7 +174,7 @@ enum AgenticExecutionFlowSuite: TestFlowRegistry {
                 "single-step",
                 "resume",
                 "continuous",
-                "pause",
+                "interruption",
             ]
         ) {
             try await AgenticExecutionFlowTesting

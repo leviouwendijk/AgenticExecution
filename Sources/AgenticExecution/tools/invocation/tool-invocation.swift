@@ -120,19 +120,82 @@ public extension ToolInvocation {
         }
     }
 
-    struct Result: Sendable, Codable, Hashable {
+    struct Prepared:
+        Sendable,
+        Codable,
+        Hashable
+    {
         public let review: Review
-        public let decision: ApprovalDecision
-        public let execution: AgentToolExecutionResult?
+        public let operation: PreparedOperation.Envelope
 
         public init(
             review: Review,
-            decision: ApprovalDecision,
-            execution: AgentToolExecutionResult?
+            operation: PreparedOperation.Envelope
         ) {
             self.review = review
-            self.decision = decision
-            self.execution = execution
+            self.operation = operation
+        }
+    }
+
+    enum Interruption:
+        String,
+        Sendable,
+        Codable,
+        Hashable,
+        CaseIterable
+    {
+        case human_review
+    }
+
+    enum Outcome:
+        Sendable,
+        Codable,
+        Hashable
+    {
+        case executed(ToolExecutionResult)
+        case denied
+        case skipped
+        case interrupted(Interruption)
+    }
+
+    struct Result:
+        Sendable,
+        Codable,
+        Hashable
+    {
+        public let review: Review
+        public let outcome: Outcome
+
+        public init(
+            review: Review,
+            outcome: Outcome
+        ) {
+            self.review = review
+            self.outcome = outcome
+        }
+
+        public var execution: ToolExecutionResult? {
+            guard case .executed(let execution) = outcome else {
+                return nil
+            }
+
+            return execution
+        }
+
+        public var decision: ApprovalDecision {
+            switch outcome {
+            case .executed:
+                return .approved
+
+            case .denied:
+                return .denied
+
+            case .skipped:
+                return .skipped
+
+            case .interrupted(.human_review):
+                return .needshuman
+            }
         }
 
         public var executed: Bool {

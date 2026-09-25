@@ -13,25 +13,11 @@ public actor PreparedIntentManager {
     public func create(
         _ draft: PreparedIntentDraft
     ) async throws -> PreparedIntent {
-        let title = try normalizedRequired(
-            draft.reviewPayload.title,
-            error: .emptyTitle
-        )
-        let summary = try normalizedRequired(
-            draft.reviewPayload.summary,
-            error: .emptySummary
-        )
-
-        var payload = draft.reviewPayload
-        payload.title = title
-        payload.summary = summary
-
         let intent = PreparedIntent(
             sessionID: normalized(
                 draft.sessionID
             ),
-            operation: draft.operation,
-            reviewPayload: payload,
+            invocation: draft.invocation,
             expiresAt: draft.expiresAt,
             idempotencyKey: normalized(
                 draft.idempotencyKey
@@ -106,8 +92,8 @@ public actor PreparedIntentManager {
             id
         )
 
-        guard !intent.status.isTerminal else {
-            throw PreparedIntentError.alreadyTerminal(
+        guard intent.status.canBeReviewed else {
+            throw PreparedIntentError.notReviewable(
                 id,
                 intent.status
             )
@@ -186,6 +172,79 @@ public actor PreparedIntentManager {
         }
 
         return intent
+    }
+
+    public func execute(
+        id: PreparedIntentIdentifier,
+        using registry: PreparedOperationRegistry,
+        context: PreparedOperation.Context = .init()
+    ) async throws -> PreparedIntent {
+        let startedAt = Date()
+        let intent = try await beginExecution(
+            id: id,
+            startedAt: startedAt
+        )
+        var metadata = intent.metadata
+
+        metadata.merge(
+            context.metadata
+        ) { _, new in
+            new
+        }
+
+        let operationContext = PreparedOperation.Context(
+            workspace: context.workspace,
+            sessionID:
+                intent.sessionID
+                ?? context.sessionID,
+            preparedIntentID: intent.id,
+            metadata: metadata
+        )
+        let result: PreparedOperation.ResultEnvelope
+
+        do {
+            result = try await registry.execute(
+                intent.operation,
+                context: operationContext
+            )
+        } catch {
+            let completedAt = Date()
+
+            _ = try? await recordExecution(
+                intent: intent,
+                id: intent.id,
+                record: .init(
+                    intentID: intent.id,
+                    operation: intent.operation.schema,
+                    status: .failed,
+                    summary: "Prepared operation '\(intent.operation.schema.identifier.rawValue)' failed.",
+                    startedAt: startedAt,
+                    completedAt: completedAt,
+                    result: nil,
+                    errorMessage: String(
+                        describing: error
+                    ),
+                    metadata: metadata
+                )
+            )
+
+            throw error
+        }
+
+        return try await recordExecution(
+            intent: intent,
+            id: intent.id,
+            record: .init(
+                intentID: intent.id,
+                operation: intent.operation.schema,
+                status: .succeeded,
+                summary: "Executed prepared operation '\(intent.operation.schema.identifier.rawValue)'.",
+                startedAt: startedAt,
+                completedAt: Date(),
+                result: result,
+                metadata: metadata
+            )
+        )
     }
 
     public func recordExecution(
@@ -290,6 +349,25 @@ public actor PreparedIntentManager {
 }
 
 private extension PreparedIntentManager {
+    func beginExecution(
+        id: PreparedIntentIdentifier,
+        startedAt: Date
+    ) async throws -> PreparedIntent {
+        var intent = try await executableIntent(
+            id: id,
+            now: startedAt
+        )
+
+        intent.status = .executing
+        intent.updatedAt = startedAt
+
+        try await store.save(
+            intent
+        )
+
+        return intent
+    }
+
     func recordExecution(
         intent: PreparedIntent,
         id: PreparedIntentIdentifier,
@@ -360,4 +438,3 @@ private extension PreparedIntentManager {
         return trimmed
     }
 }
-

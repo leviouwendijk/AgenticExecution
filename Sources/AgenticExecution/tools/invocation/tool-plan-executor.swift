@@ -2,7 +2,7 @@ import Agentic
 import Foundation
 import Workspace
 
-public struct AgentToolPlanExecutor:
+public struct ToolPlanExecutor:
     Sendable
 {
     public let invoker: ToolInvoker
@@ -18,7 +18,7 @@ public struct AgentToolPlanExecutor:
         workspace: WorkspaceContext? = nil,
         guidelineRelations: [AgentGuidelineRelation] = [],
         approvalHandler: (any ToolApprovalHandler)? = nil
-    ) async throws -> AgentToolPlanResult {
+    ) async throws -> ToolPlan.Result {
         var guidelineRelations = guidelineRelations
 
         for relation in plan.guidelines
@@ -27,9 +27,13 @@ public struct AgentToolPlanExecutor:
             guidelineRelations.append(relation)
         }
 
+        let navigator = ToolPlan.Navigator(
+            plan
+        )
         let execution = await execute(
             plan.root,
-            path: "root",
+            path: navigator.rootPath,
+            navigator: navigator,
             workspace: workspace,
             guidelineRelations: guidelineRelations,
             approvalHandler: approvalHandler
@@ -43,17 +47,18 @@ public struct AgentToolPlanExecutor:
     }
 }
 
-private extension AgentToolPlanExecutor {
+private extension ToolPlanExecutor {
     struct NodeExecution:
         Sendable
     {
-        let outcome: AgentToolPlanOutcome
-        let records: [AgentToolPlanRecord]
+        let outcome: ToolPlan.Outcome
+        let records: [ToolPlan.Record]
     }
 
     func execute(
         _ node: ToolPlan.Node,
         path: String,
+        navigator: ToolPlan.Navigator,
         workspace: WorkspaceContext?,
         guidelineRelations: [AgentGuidelineRelation],
         approvalHandler: (any ToolApprovalHandler)?
@@ -63,6 +68,7 @@ private extension AgentToolPlanExecutor {
             return await executeCall(
                 node,
                 path: path,
+                navigator: navigator,
                 workspace: workspace,
                 guidelineRelations: guidelineRelations,
                 approvalHandler: approvalHandler
@@ -72,6 +78,7 @@ private extension AgentToolPlanExecutor {
             return await executeSequence(
                 node.children,
                 path: path,
+                navigator: navigator,
                 workspace: workspace,
                 guidelineRelations: guidelineRelations,
                 approvalHandler: approvalHandler
@@ -81,6 +88,7 @@ private extension AgentToolPlanExecutor {
             return await executeBatch(
                 node.children,
                 path: path,
+                navigator: navigator,
                 workspace: workspace,
                 guidelineRelations: guidelineRelations,
                 approvalHandler: approvalHandler
@@ -91,6 +99,7 @@ private extension AgentToolPlanExecutor {
     func executeCall(
         _ node: ToolPlan.Node,
         path: String,
+        navigator: ToolPlan.Navigator,
         workspace: WorkspaceContext?,
         guidelineRelations: [AgentGuidelineRelation],
         approvalHandler: (any ToolApprovalHandler)?
@@ -120,7 +129,7 @@ private extension AgentToolPlanExecutor {
                 approvalHandler: approvalHandler
             )
         } catch {
-            let record = AgentToolPlanRecord(
+            let record = ToolPlan.Record(
                 path: path,
                 call: call,
                 outcome: .failed,
@@ -136,6 +145,7 @@ private extension AgentToolPlanExecutor {
                 for: .failed,
                 node: node,
                 path: path,
+                navigator: navigator,
                 workspace: workspace,
                 guidelineRelations: guidelineRelations,
                 approvalHandler: approvalHandler
@@ -155,8 +165,7 @@ private extension AgentToolPlanExecutor {
         let outcome = outcome(
             for: invocation
         )
-
-        let record = AgentToolPlanRecord(
+        let record = ToolPlan.Record(
             path: path,
             call: call,
             outcome: outcome,
@@ -164,41 +173,21 @@ private extension AgentToolPlanExecutor {
             toolFailure: invocation.execution?.failure,
             errorDescription: invocation.execution?.failure?.message
         )
-
         let branches = await branchRecords(
             for: outcome,
             node: node,
             path: path,
+            navigator: navigator,
             workspace: workspace,
             guidelineRelations: guidelineRelations,
             approvalHandler: approvalHandler
         )
 
-        let finalOutcome: AgentToolPlanOutcome
-
-        switch outcome {
-        case .succeeded:
-            finalOutcome = branches.selectedOutcome
-
-        case .failed,
-             .denied:
-            finalOutcome =
-                branches.selectedOutcome == .needs_human_review
-                    ? .needs_human_review
-                    : outcome
-
-        case .needs_human_review:
-            finalOutcome = .needs_human_review
-
-        case .skipped:
-            finalOutcome = .succeeded
-
-        case .mixed:
-            finalOutcome = .mixed
-        }
-
         return .init(
-            outcome: finalOutcome,
+            outcome: navigator.finalOutcome(
+                outcome: outcome,
+                selectedOutcome: branches.selectedOutcome
+            ),
             records:
                 [record]
                 + branches.records
@@ -209,29 +198,26 @@ private extension AgentToolPlanExecutor {
         _ nodes: [ToolPlan.Node],
         path: String,
         pathComponent: String? = "sequence",
+        navigator: ToolPlan.Navigator,
         workspace: WorkspaceContext?,
         guidelineRelations: [AgentGuidelineRelation],
         approvalHandler: (any ToolApprovalHandler)?
     ) async -> NodeExecution {
-        var records: [AgentToolPlanRecord] = []
+        var records: [ToolPlan.Record] = []
 
         for (
             index,
             node
         ) in nodes.enumerated() {
-            let childPath: String
-
-            if let pathComponent {
-                childPath =
-                    "\(path).\(pathComponent)[\(index)]"
-            } else {
-                childPath =
-                    "\(path)[\(index)]"
-            }
-
+            let childPath = navigator.sequencePath(
+                beneath: path,
+                component: pathComponent,
+                index: index
+            )
             let child = await execute(
                 node,
                 path: childPath,
+                navigator: navigator,
                 workspace: workspace,
                 guidelineRelations: guidelineRelations,
                 approvalHandler: approvalHandler
@@ -242,21 +228,17 @@ private extension AgentToolPlanExecutor {
             )
 
             guard child.outcome == .succeeded else {
-                for remainingIndex in nodes.indices where remainingIndex > index {
-                    let remainingPath: String
-
-                    if let pathComponent {
-                        remainingPath =
-                            "\(path).\(pathComponent)[\(remainingIndex)]"
-                    } else {
-                        remainingPath =
-                            "\(path)[\(remainingIndex)]"
-                    }
-
+                for remainingIndex in nodes.indices
+                where remainingIndex > index
+                {
                     records.append(
-                        contentsOf: skippedRecords(
+                        contentsOf: navigator.skippedRecords(
                             for: nodes[remainingIndex],
-                            path: remainingPath,
+                            path: navigator.sequencePath(
+                                beneath: path,
+                                component: pathComponent,
+                                index: remainingIndex
+                            ),
                             reason: "sequence_stopped_after_\(child.outcome.rawValue)"
                         )
                     )
@@ -278,23 +260,27 @@ private extension AgentToolPlanExecutor {
     func executeBatch(
         _ nodes: [ToolPlan.Node],
         path: String,
+        navigator: ToolPlan.Navigator,
         workspace: WorkspaceContext?,
         guidelineRelations: [AgentGuidelineRelation],
         approvalHandler: (any ToolApprovalHandler)?
     ) async -> NodeExecution {
-        var records: [AgentToolPlanRecord] = []
-        var outcomes: [AgentToolPlanOutcome] = []
+        var records: [ToolPlan.Record] = []
+        var outcomes: [ToolPlan.Outcome] = []
 
         for (
             index,
             node
         ) in nodes.enumerated() {
-            let childPath =
-                "\(path).batch[\(index)]"
-
+            let childPath = navigator.childPath(
+                beneath: path,
+                kind: .batch,
+                index: index
+            )
             let child = await execute(
                 node,
                 path: childPath,
+                navigator: navigator,
                 workspace: workspace,
                 guidelineRelations: guidelineRelations,
                 approvalHandler: approvalHandler
@@ -303,17 +289,22 @@ private extension AgentToolPlanExecutor {
             records.append(
                 contentsOf: child.records
             )
-
             outcomes.append(
                 child.outcome
             )
 
             if child.outcome == .needs_human_review {
-                for remainingIndex in nodes.indices where remainingIndex > index {
+                for remainingIndex in nodes.indices
+                where remainingIndex > index
+                {
                     records.append(
-                        contentsOf: skippedRecords(
+                        contentsOf: navigator.skippedRecords(
                             for: nodes[remainingIndex],
-                            path: "\(path).batch[\(remainingIndex)]",
+                            path: navigator.childPath(
+                                beneath: path,
+                                kind: .batch,
+                                index: remainingIndex
+                            ),
                             reason: "batch_suspended_for_approval"
                         )
                     )
@@ -327,7 +318,7 @@ private extension AgentToolPlanExecutor {
         }
 
         return .init(
-            outcome: aggregate(
+            outcome: navigator.aggregate(
                 outcomes
             ),
             records: records
@@ -335,88 +326,59 @@ private extension AgentToolPlanExecutor {
     }
 
     func branchRecords(
-        for outcome: AgentToolPlanOutcome,
+        for outcome: ToolPlan.Outcome,
         node: ToolPlan.Node,
         path: String,
+        navigator: ToolPlan.Navigator,
         workspace: WorkspaceContext?,
         guidelineRelations: [AgentGuidelineRelation],
         approvalHandler: (any ToolApprovalHandler)?
     ) async -> (
-        selectedOutcome: AgentToolPlanOutcome,
-        records: [AgentToolPlanRecord]
+        selectedOutcome: ToolPlan.Outcome,
+        records: [ToolPlan.Record]
     ) {
-        let selectedLabel: String?
-        let selectedNodes: [ToolPlan.Node]
+        let selectedBranch = navigator.branch(
+            for: outcome,
+            node: node
+        )
 
-        switch outcome {
-        case .succeeded:
-            selectedLabel = "onSuccess"
-            selectedNodes = node.onSuccess
+        var records: [ToolPlan.Record] = []
+        var selectedOutcome: ToolPlan.Outcome = .succeeded
 
-        case .failed:
-            selectedLabel = "onFailure"
-            selectedNodes = node.onFailure
-
-        case .denied:
-            selectedLabel = "onDenied"
-            selectedNodes = node.onDenied
-
-        case .needs_human_review,
-             .skipped,
-             .mixed:
-            selectedLabel = nil
-            selectedNodes = []
-        }
-
-        var records: [AgentToolPlanRecord] = []
-        var selectedOutcome: AgentToolPlanOutcome = .succeeded
-
-        if let selectedLabel {
+        if let selectedBranch {
             let selected = await executeSequence(
-                selectedNodes,
-                path: "\(path).\(selectedLabel)",
+                selectedBranch.nodes,
+                path: "\(path).\(selectedBranch.label.rawValue)",
                 pathComponent: nil,
+                navigator: navigator,
                 workspace: workspace,
                 guidelineRelations: guidelineRelations,
                 approvalHandler: approvalHandler
             )
 
             selectedOutcome = selected.outcome
-
             records.append(
                 contentsOf: selected.records
             )
         }
 
-        let branches: [
-            (
-                label: String,
-                nodes: [ToolPlan.Node]
-            )
-        ] = [
-            (
-                "onSuccess",
-                node.onSuccess
-            ),
-            (
-                "onFailure",
-                node.onFailure
-            ),
-            (
-                "onDenied",
-                node.onDenied
-            ),
-        ]
-
-        for branch in branches where branch.label != selectedLabel {
+        for branch in navigator.branches(
+            of: node
+        )
+        where branch.label != selectedBranch?.label
+        {
             for (
                 index,
                 branchNode
             ) in branch.nodes.enumerated() {
                 records.append(
-                    contentsOf: skippedRecords(
+                    contentsOf: navigator.skippedRecords(
                         for: branchNode,
-                        path: "\(path).\(branch.label)[\(index)]",
+                        path: navigator.branchPath(
+                            beneath: path,
+                            label: branch.label,
+                            index: index
+                        ),
                         reason: "condition_not_selected"
                     )
                 )
@@ -431,13 +393,9 @@ private extension AgentToolPlanExecutor {
 
     func outcome(
         for invocation: ToolInvocation.Result
-    ) -> AgentToolPlanOutcome {
-        switch invocation.decision {
-        case .approved:
-            guard let execution = invocation.execution else {
-                return .failed
-            }
-
+    ) -> ToolPlan.Outcome {
+        switch invocation.outcome {
+        case .executed(let execution):
             return execution.result.isError
                 ? .failed
                 : .succeeded
@@ -448,104 +406,8 @@ private extension AgentToolPlanExecutor {
         case .skipped:
             return .skipped
 
-        case .needshuman:
+        case .interrupted(.human_review):
             return .needs_human_review
-        }
-    }
-
-    func aggregate(
-        _ outcomes: [AgentToolPlanOutcome]
-    ) -> AgentToolPlanOutcome {
-        guard let first = outcomes.first else {
-            return .succeeded
-        }
-
-        return outcomes.dropFirst().allSatisfy {
-            $0 == first
-        }
-            ? first
-            : .mixed
-    }
-
-    func skippedRecords(
-        for node: ToolPlan.Node,
-        path: String,
-        reason: String
-    ) -> [AgentToolPlanRecord] {
-        switch node.kind {
-        case .call:
-            guard let call = node.call else {
-                return []
-            }
-
-            var records = [
-                AgentToolPlanRecord(
-                    path: path,
-                    call: call,
-                    outcome: .skipped,
-                    skipReason: reason
-                )
-            ]
-
-            records.append(
-                contentsOf: skippedBranchRecords(
-                    node.onSuccess,
-                    label: "onSuccess",
-                    path: path,
-                    reason: reason
-                )
-            )
-
-            records.append(
-                contentsOf: skippedBranchRecords(
-                    node.onFailure,
-                    label: "onFailure",
-                    path: path,
-                    reason: reason
-                )
-            )
-
-            records.append(
-                contentsOf: skippedBranchRecords(
-                    node.onDenied,
-                    label: "onDenied",
-                    path: path,
-                    reason: reason
-                )
-            )
-
-            return records
-
-        case .sequence,
-             .batch:
-            return node.children.enumerated().flatMap {
-                index,
-                child in
-
-                skippedRecords(
-                    for: child,
-                    path: "\(path).\(node.kind.rawValue)[\(index)]",
-                    reason: reason
-                )
-            }
-        }
-    }
-
-    func skippedBranchRecords(
-        _ nodes: [ToolPlan.Node],
-        label: String,
-        path: String,
-        reason: String
-    ) -> [AgentToolPlanRecord] {
-        nodes.enumerated().flatMap {
-            index,
-            node in
-
-            skippedRecords(
-                for: node,
-                path: "\(path).\(label)[\(index)]",
-                reason: reason
-            )
         }
     }
 

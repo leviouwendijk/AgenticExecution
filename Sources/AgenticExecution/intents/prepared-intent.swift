@@ -5,9 +5,8 @@ import Primitives
 public struct PreparedIntent: Sendable, Codable, Hashable, Identifiable {
     public let id: PreparedIntentIdentifier
     public var sessionID: String?
-    public var operation: PreparedOperation.Envelope
+    public var invocation: ToolInvocation.Prepared
     public var status: PreparedIntentStatus
-    public var reviewPayload: PreparedIntentReviewPayload
     public var expiresAt: Date?
     public var idempotencyKey: String?
     public var createdAt: Date
@@ -21,9 +20,8 @@ public struct PreparedIntent: Sendable, Codable, Hashable, Identifiable {
     public init(
         id: PreparedIntentIdentifier = .init(UUID().uuidString),
         sessionID: String? = nil,
-        operation: PreparedOperation.Envelope,
+        invocation: ToolInvocation.Prepared,
         status: PreparedIntentStatus = .pending_review,
-        reviewPayload: PreparedIntentReviewPayload,
         expiresAt: Date? = nil,
         idempotencyKey: String? = nil,
         createdAt: Date = Date(),
@@ -36,9 +34,8 @@ public struct PreparedIntent: Sendable, Codable, Hashable, Identifiable {
     ) {
         self.id = id
         self.sessionID = sessionID
-        self.operation = operation
+        self.invocation = invocation
         self.status = status
-        self.reviewPayload = reviewPayload
         self.expiresAt = expiresAt
         self.idempotencyKey = idempotencyKey
         self.createdAt = createdAt
@@ -52,6 +49,14 @@ public struct PreparedIntent: Sendable, Codable, Hashable, Identifiable {
 }
 
 public extension PreparedIntent {
+    var operation: PreparedOperation.Envelope {
+        invocation.operation
+    }
+
+    var preflight: ToolPreflight {
+        invocation.review.preflight
+    }
+
     func isExpired(
         at date: Date = Date()
     ) -> Bool {
@@ -74,4 +79,3 @@ public extension PreparedIntent {
         executionRecord?.result
     }
 }
-

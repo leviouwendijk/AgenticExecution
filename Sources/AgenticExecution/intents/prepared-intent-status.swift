@@ -10,6 +10,7 @@ public enum PreparedIntentStatus:
 {
     case pending_review
     case approved
+    case executing
     case denied
     case cancelled
     case expired
@@ -27,7 +28,8 @@ public extension PreparedIntentStatus {
     var isTerminal: Bool {
         switch self {
         case .pending_review,
-             .approved:
+             .approved,
+             .executing:
             return false
 
         case .denied,
@@ -45,7 +47,8 @@ public extension PreparedIntentStatus {
              .approved:
             return true
 
-        case .denied,
+        case .executing,
+             .denied,
              .cancelled,
              .expired,
              .executed,

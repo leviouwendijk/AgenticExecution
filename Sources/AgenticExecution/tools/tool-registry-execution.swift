@@ -17,7 +17,7 @@ public extension ToolRegistry {
     func execute(
         _ call: ToolCall,
         workspace: WorkspaceContext? = nil
-    ) async throws -> AgentToolExecutionResult {
+    ) async throws -> ToolExecutionResult {
         guard let registered =
             registeredTool(
                 identifiedBy: call.tool

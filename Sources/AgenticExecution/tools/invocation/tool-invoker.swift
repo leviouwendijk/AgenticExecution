@@ -73,8 +73,9 @@ public struct ToolInvoker: Sendable {
             guard let approvalHandler else {
                 return .init(
                     review: review,
-                    decision: .needshuman,
-                    execution: nil
+                    outcome: .interrupted(
+                        .human_review
+                    )
                 )
             }
 
@@ -86,25 +87,44 @@ public struct ToolInvoker: Sendable {
             decision = .denied
         }
 
-        guard decision == .approved else {
+        switch decision {
+        case .approved:
+            let execution = try await ToolExecution(
+                registry: registry,
+                recovery: recovery,
+                workspace: workspace
+            ).execute(
+                call,
+                preflight: review.preflight
+            )
+
             return .init(
                 review: review,
-                decision: decision,
-                execution: nil
+                outcome: .executed(
+                    execution
+                )
+            )
+
+        case .denied:
+            return .init(
+                review: review,
+                outcome: .denied
+            )
+
+        case .skipped:
+            return .init(
+                review: review,
+                outcome: .skipped
+            )
+
+        case .needshuman:
+            return .init(
+                review: review,
+                outcome: .interrupted(
+                    .human_review
+                )
             )
         }
-
-        let toolExecution = try await executeApproved(
-            call,
-            preflight: review.preflight,
-            workspace: workspace
-        )
-
-        return .init(
-            review: review,
-            decision: decision,
-            execution: toolExecution
-        )
     }
 
     public func invoke(
@@ -112,8 +132,8 @@ public struct ToolInvoker: Sendable {
         workspace: WorkspaceContext? = nil,
         guidelineRelations: [AgentGuidelineRelation] = [],
         approvalHandler: (any ToolApprovalHandler)? = nil
-    ) async throws -> AgentToolPlanResult {
-        try await AgentToolPlanExecutor(
+    ) async throws -> ToolPlan.Result {
+        try await ToolPlanExecutor(
             invoker: self
         ).execute(
             plan,

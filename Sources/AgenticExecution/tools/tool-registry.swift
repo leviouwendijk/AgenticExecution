@@ -199,7 +199,7 @@ public struct ToolRegistry: Sendable, ToolAvailability {
     public func call(
         _ toolCall: ToolCall,
         workspace: WorkspaceContext?
-    ) async throws -> AgentToolExecutionResult {
+    ) async throws -> ToolExecutionResult {
         try await execute(
             toolCall,
             workspace: workspace
