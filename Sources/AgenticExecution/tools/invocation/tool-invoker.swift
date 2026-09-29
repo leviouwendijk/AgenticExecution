@@ -63,6 +63,18 @@ public struct ToolInvoker: Sendable {
             references: references
         )
 
+        return try await invoke(
+            review,
+            workspace: workspace,
+            approvalHandler: approvalHandler
+        )
+    }
+
+    public func invoke(
+        _ review: ToolInvocation.Review,
+        workspace: WorkspaceContext? = nil,
+        approvalHandler: (any ToolApprovalHandler)? = nil
+    ) async throws -> ToolInvocation.Result {
         let decision: ApprovalDecision
 
         switch review.requirement {
@@ -94,7 +106,7 @@ public struct ToolInvoker: Sendable {
                 recovery: recovery,
                 workspace: workspace
             ).execute(
-                call,
+                review.call,
                 preflight: review.preflight
             )
 
