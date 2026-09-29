@@ -9,7 +9,7 @@ public extension ToolPlan.RunExecutor {
         relationship: ToolPlan.Run.Relationship = .root,
         executionPolicy: ToolPlan.ExecutionPolicy,
         workspace: WorkspaceContext? = nil,
-        guidelineRelations: [AgentGuidelineRelation] = [],
+        references: [Reference] = [],
         approvalHandler: (any ToolApprovalHandler)? = nil
     ) async throws -> ToolPlan.Run {
         switch executionPolicy {
@@ -19,7 +19,7 @@ public extension ToolPlan.RunExecutor {
                 runID: runID,
                 relationship: relationship,
                 workspace: workspace,
-                guidelineRelations: guidelineRelations,
+                references: references,
                 approvalHandler: approvalHandler
             )
 
@@ -29,7 +29,7 @@ public extension ToolPlan.RunExecutor {
                 runID: runID,
                 relationship: relationship,
                 workspace: workspace,
-                guidelineRelations: guidelineRelations,
+                references: references,
                 approvalHandler: approvalHandler
             )
         }
@@ -39,7 +39,7 @@ public extension ToolPlan.RunExecutor {
         _ run: ToolPlan.Run,
         executionPolicy: ToolPlan.ExecutionPolicy,
         workspace: WorkspaceContext? = nil,
-        guidelineRelations: [AgentGuidelineRelation] = [],
+        references: [Reference] = [],
         approvalHandler: (any ToolApprovalHandler)? = nil
     ) async throws -> ToolPlan.Run {
         let interruption = try policyInterruption(
@@ -57,7 +57,7 @@ public extension ToolPlan.RunExecutor {
                     current,
                     executionPolicy: .single_step,
                     workspace: workspace,
-                    guidelineRelations: guidelineRelations,
+                    references: references,
                     approvalHandler: approvalHandler
                 )
             }
@@ -69,7 +69,7 @@ public extension ToolPlan.RunExecutor {
                 run,
                 interruption: interruption,
                 workspace: workspace,
-                guidelineRelations: guidelineRelations,
+                references: references,
                 approvalHandler: approvalHandler
             )
         }
@@ -82,7 +82,7 @@ private extension ToolPlan.RunExecutor {
         runID: String,
         relationship: ToolPlan.Run.Relationship,
         workspace: WorkspaceContext?,
-        guidelineRelations: [AgentGuidelineRelation],
+        references: [Reference],
         approvalHandler: (any ToolApprovalHandler)?
     ) async throws -> ToolPlan.Run {
         let navigator = ToolPlan.Navigator(
@@ -98,7 +98,7 @@ private extension ToolPlan.RunExecutor {
                 runID: runID,
                 relationship: relationship,
                 workspace: workspace,
-                guidelineRelations: guidelineRelations,
+                references: references,
                 approvalHandler: approvalHandler
             )
         }
@@ -107,14 +107,14 @@ private extension ToolPlan.RunExecutor {
         let isolatedPlan = try ToolPlan(
             id: "\(plan.id).single-step.\(attemptNumber)",
             root: step.node,
-            guidelines: plan.guidelines
+            references: plan.references
         )
         let isolatedRun = try await start(
             isolatedPlan,
             runID: "\(runID).single-step.\(attemptNumber)",
             relationship: relationship,
             workspace: workspace,
-            guidelineRelations: guidelineRelations,
+            references: references,
             approvalHandler: approvalHandler
         )
 
@@ -198,7 +198,7 @@ private extension ToolPlan.RunExecutor {
         _ run: ToolPlan.Run,
         interruption: ToolPlan.Run.Interruption,
         workspace: WorkspaceContext?,
-        guidelineRelations: [AgentGuidelineRelation],
+        references: [Reference],
         approvalHandler: (any ToolApprovalHandler)?
     ) async throws -> ToolPlan.Run {
         let point = interruption.point
@@ -256,14 +256,14 @@ private extension ToolPlan.RunExecutor {
         let isolatedPlan = try ToolPlan(
             id: "\(run.plan.id).single-step.\(attemptNumber)",
             root: step.node,
-            guidelines: run.plan.guidelines
+            references: run.plan.references
         )
         let isolatedRun = try await start(
             isolatedPlan,
             runID: "\(run.id).single-step.\(attemptNumber)",
             relationship: run.relationship,
             workspace: workspace,
-            guidelineRelations: guidelineRelations,
+            references: references,
             approvalHandler: approvalHandler
         )
 

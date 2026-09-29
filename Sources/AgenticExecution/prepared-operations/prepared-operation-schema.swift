@@ -1,11 +1,14 @@
+import Macros
 import Primitives
+import Schema
 import Version
 
 public enum PreparedOperation {}
 
 public extension PreparedOperation {
     struct Identifier:
-        StringIdentifier
+        StringIdentifier,
+        JSONSchemaProviding
     {
         public let rawValue: String
 
@@ -14,8 +17,13 @@ public extension PreparedOperation {
         ) {
             self.rawValue = rawValue
         }
+
+        public static var jsonschema: JSONSchema {
+            .string()
+        }
     }
 
+    @JSONSchema
     struct Schema:
         Sendable,
         Codable,

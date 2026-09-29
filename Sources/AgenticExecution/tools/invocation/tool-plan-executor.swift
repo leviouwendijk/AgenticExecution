@@ -16,15 +16,15 @@ public struct ToolPlanExecutor:
     public func execute(
         _ plan: ToolPlan,
         workspace: WorkspaceContext? = nil,
-        guidelineRelations: [AgentGuidelineRelation] = [],
+        references: [Reference] = [],
         approvalHandler: (any ToolApprovalHandler)? = nil
     ) async throws -> ToolPlan.Result {
-        var guidelineRelations = guidelineRelations
+        var references = references
 
-        for relation in plan.guidelines
-        where !guidelineRelations.contains(relation)
+        for reference in plan.references
+        where !references.contains(reference)
         {
-            guidelineRelations.append(relation)
+            references.append(reference)
         }
 
         let navigator = ToolPlan.Navigator(
@@ -35,7 +35,7 @@ public struct ToolPlanExecutor:
             path: navigator.rootPath,
             navigator: navigator,
             workspace: workspace,
-            guidelineRelations: guidelineRelations,
+            references: references,
             approvalHandler: approvalHandler
         )
 
@@ -60,7 +60,7 @@ private extension ToolPlanExecutor {
         path: String,
         navigator: ToolPlan.Navigator,
         workspace: WorkspaceContext?,
-        guidelineRelations: [AgentGuidelineRelation],
+        references: [Reference],
         approvalHandler: (any ToolApprovalHandler)?
     ) async -> NodeExecution {
         switch node.kind {
@@ -70,7 +70,7 @@ private extension ToolPlanExecutor {
                 path: path,
                 navigator: navigator,
                 workspace: workspace,
-                guidelineRelations: guidelineRelations,
+                references: references,
                 approvalHandler: approvalHandler
             )
 
@@ -80,7 +80,7 @@ private extension ToolPlanExecutor {
                 path: path,
                 navigator: navigator,
                 workspace: workspace,
-                guidelineRelations: guidelineRelations,
+                references: references,
                 approvalHandler: approvalHandler
             )
 
@@ -90,7 +90,7 @@ private extension ToolPlanExecutor {
                 path: path,
                 navigator: navigator,
                 workspace: workspace,
-                guidelineRelations: guidelineRelations,
+                references: references,
                 approvalHandler: approvalHandler
             )
         }
@@ -101,7 +101,7 @@ private extension ToolPlanExecutor {
         path: String,
         navigator: ToolPlan.Navigator,
         workspace: WorkspaceContext?,
-        guidelineRelations: [AgentGuidelineRelation],
+        references: [Reference],
         approvalHandler: (any ToolApprovalHandler)?
     ) async -> NodeExecution {
         guard let call = node.call else {
@@ -125,7 +125,7 @@ private extension ToolPlanExecutor {
                 call,
                 execution: execution,
                 workspace: workspace,
-                guidelineRelations: guidelineRelations,
+                references: references,
                 approvalHandler: approvalHandler
             )
         } catch {
@@ -147,7 +147,7 @@ private extension ToolPlanExecutor {
                 path: path,
                 navigator: navigator,
                 workspace: workspace,
-                guidelineRelations: guidelineRelations,
+                references: references,
                 approvalHandler: approvalHandler
             )
 
@@ -179,7 +179,7 @@ private extension ToolPlanExecutor {
             path: path,
             navigator: navigator,
             workspace: workspace,
-            guidelineRelations: guidelineRelations,
+            references: references,
             approvalHandler: approvalHandler
         )
 
@@ -200,7 +200,7 @@ private extension ToolPlanExecutor {
         pathComponent: String? = "sequence",
         navigator: ToolPlan.Navigator,
         workspace: WorkspaceContext?,
-        guidelineRelations: [AgentGuidelineRelation],
+        references: [Reference],
         approvalHandler: (any ToolApprovalHandler)?
     ) async -> NodeExecution {
         var records: [ToolPlan.Record] = []
@@ -219,7 +219,7 @@ private extension ToolPlanExecutor {
                 path: childPath,
                 navigator: navigator,
                 workspace: workspace,
-                guidelineRelations: guidelineRelations,
+                references: references,
                 approvalHandler: approvalHandler
             )
 
@@ -262,7 +262,7 @@ private extension ToolPlanExecutor {
         path: String,
         navigator: ToolPlan.Navigator,
         workspace: WorkspaceContext?,
-        guidelineRelations: [AgentGuidelineRelation],
+        references: [Reference],
         approvalHandler: (any ToolApprovalHandler)?
     ) async -> NodeExecution {
         var records: [ToolPlan.Record] = []
@@ -282,7 +282,7 @@ private extension ToolPlanExecutor {
                 path: childPath,
                 navigator: navigator,
                 workspace: workspace,
-                guidelineRelations: guidelineRelations,
+                references: references,
                 approvalHandler: approvalHandler
             )
 
@@ -331,7 +331,7 @@ private extension ToolPlanExecutor {
         path: String,
         navigator: ToolPlan.Navigator,
         workspace: WorkspaceContext?,
-        guidelineRelations: [AgentGuidelineRelation],
+        references: [Reference],
         approvalHandler: (any ToolApprovalHandler)?
     ) async -> (
         selectedOutcome: ToolPlan.Outcome,
@@ -352,7 +352,7 @@ private extension ToolPlanExecutor {
                 pathComponent: nil,
                 navigator: navigator,
                 workspace: workspace,
-                guidelineRelations: guidelineRelations,
+                references: references,
                 approvalHandler: approvalHandler
             )
 

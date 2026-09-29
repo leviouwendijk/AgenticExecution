@@ -1,7 +1,10 @@
 import Agentic
 import Foundation
+import Macros
 import Primitives
+import Schema
 
+@JSONSchema
 public struct PreparedIntent: Sendable, Codable, Hashable, Identifiable {
     public let id: PreparedIntentIdentifier
     public var sessionID: String?

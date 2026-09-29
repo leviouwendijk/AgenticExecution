@@ -21,7 +21,7 @@ public struct ToolInvoker: Sendable {
         _ call: ToolCall,
         execution: ToolInvocation.Execution? = nil,
         workspace: WorkspaceContext? = nil,
-        guidelineRelations: [AgentGuidelineRelation] = []
+        references: [Reference] = []
     ) async throws -> ToolInvocation.Review {
         let workspace = try targetedWorkspace(
             for: call,
@@ -40,7 +40,7 @@ public struct ToolInvoker: Sendable {
             requirement: policy.evaluate(
                 preflight
             ),
-            guidelineRelations: guidelineRelations
+            references: references
         )
     }
 
@@ -48,7 +48,7 @@ public struct ToolInvoker: Sendable {
         _ call: ToolCall,
         execution: ToolInvocation.Execution? = nil,
         workspace: WorkspaceContext? = nil,
-        guidelineRelations: [AgentGuidelineRelation] = [],
+        references: [Reference] = [],
         approvalHandler: (any ToolApprovalHandler)? = nil
     ) async throws -> ToolInvocation.Result {
         let workspace = try targetedWorkspace(
@@ -60,7 +60,7 @@ public struct ToolInvoker: Sendable {
         let review = try await review(
             call,
             workspace: workspace,
-            guidelineRelations: guidelineRelations
+            references: references
         )
 
         let decision: ApprovalDecision
@@ -130,7 +130,7 @@ public struct ToolInvoker: Sendable {
     public func invoke(
         _ plan: ToolPlan,
         workspace: WorkspaceContext? = nil,
-        guidelineRelations: [AgentGuidelineRelation] = [],
+        references: [Reference] = [],
         approvalHandler: (any ToolApprovalHandler)? = nil
     ) async throws -> ToolPlan.Result {
         try await ToolPlanExecutor(
@@ -138,7 +138,7 @@ public struct ToolInvoker: Sendable {
         ).execute(
             plan,
             workspace: workspace,
-            guidelineRelations: guidelineRelations,
+            references: references,
             approvalHandler: approvalHandler
         )
     }

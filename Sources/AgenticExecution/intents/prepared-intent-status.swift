@@ -1,12 +1,13 @@
+import Macros
 import Schema
 
+@JSONSchema
 public enum PreparedIntentStatus:
     String,
     Sendable,
     Codable,
     Hashable,
-    CaseIterable,
-    JSONSchemaProviding
+    CaseIterable
 {
     case pending_review
     case approved
@@ -16,12 +17,6 @@ public enum PreparedIntentStatus:
     case expired
     case executed
     case execution_failed
-
-    public static var jsonschema: JSONSchema {
-        .string(
-            cases: allCases.map(\.rawValue)
-        )
-    }
 }
 
 public extension PreparedIntentStatus {

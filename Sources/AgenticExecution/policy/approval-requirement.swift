@@ -1,3 +1,7 @@
+import Macros
+import Schema
+
+@JSONSchema
 public enum ApprovalRequirement: String, Sendable, Codable, Hashable, CaseIterable {
     case no_approval_needed
     case needs_human_review

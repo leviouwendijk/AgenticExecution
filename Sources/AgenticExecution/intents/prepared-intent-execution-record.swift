@@ -1,6 +1,9 @@
 import Agentic
 import Foundation
+import Macros
+import Schema
 
+@JSONSchema
 public enum PreparedIntentExecutionStatus: String, Sendable, Codable, Hashable, CaseIterable {
     case succeeded
     case failed
@@ -18,6 +21,7 @@ public extension PreparedIntentExecutionStatus {
     }
 }
 
+@JSONSchema
 public struct PreparedIntentExecutionRecord: Sendable, Codable, Hashable, Identifiable {
     public let id: String
     public let intentID: PreparedIntentIdentifier

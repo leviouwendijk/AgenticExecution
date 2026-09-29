@@ -1,3 +1,7 @@
+import Macros
+import Schema
+
+@JSONSchema
 public enum ApprovalDecision: String, Sendable, Codable, Hashable, CaseIterable {
     case approved
     case denied

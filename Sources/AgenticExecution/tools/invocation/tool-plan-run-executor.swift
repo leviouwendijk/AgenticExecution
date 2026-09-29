@@ -25,13 +25,13 @@ public extension ToolPlan {
             runID: String = UUID().uuidString,
             relationship: ToolPlan.Run.Relationship = .root,
             workspace: WorkspaceContext? = nil,
-            guidelineRelations: [AgentGuidelineRelation] = [],
+            references: [Reference] = [],
             approvalHandler: (any ToolApprovalHandler)? = nil
         ) async throws -> ToolPlan.Run {
             let result = try await planExecutor.execute(
                 plan,
                 workspace: workspace,
-                guidelineRelations: guidelineRelations,
+                references: references,
                 approvalHandler: approvalHandler
             )
             let attemptNumber = 1
@@ -63,7 +63,7 @@ public extension ToolPlan {
         public func retry(
             _ run: ToolPlan.Run,
             workspace: WorkspaceContext? = nil,
-            guidelineRelations: [AgentGuidelineRelation] = [],
+            references: [Reference] = [],
             approvalHandler: (any ToolApprovalHandler)? = nil
         ) async throws -> ToolPlan.Run {
             let interruption = try unresolvedExecutionInterruption(
@@ -90,12 +90,12 @@ public extension ToolPlan {
             let retryPlan = try ToolPlan(
                 id: "\(run.plan.id).retry.\(attemptNumber)",
                 root: node,
-                guidelines: run.plan.guidelines
+                references: run.plan.references
             )
             let rawResult = try await planExecutor.execute(
                 retryPlan,
                 workspace: workspace,
-                guidelineRelations: guidelineRelations,
+                references: references,
                 approvalHandler: approvalHandler
             )
             let result = navigator.remap(
@@ -201,7 +201,7 @@ public extension ToolPlan {
         public func resume(
             _ run: ToolPlan.Run,
             workspace: WorkspaceContext? = nil,
-            guidelineRelations: [AgentGuidelineRelation] = [],
+            references: [Reference] = [],
             approvalHandler: (any ToolApprovalHandler)? = nil
         ) async throws -> ToolPlan.Run {
             guard case .interrupted(let interruption) = run.state else {
@@ -217,7 +217,7 @@ public extension ToolPlan {
                 afterPath: interruption.point.path,
                 afterCallID: interruption.point.callID,
                 workspace: workspace,
-                guidelineRelations: guidelineRelations,
+                references: references,
                 approvalHandler: approvalHandler
             )
         }
@@ -227,7 +227,7 @@ public extension ToolPlan {
             afterPath: String,
             afterCallID: String,
             workspace: WorkspaceContext?,
-            guidelineRelations: [AgentGuidelineRelation],
+            references: [Reference],
             approvalHandler: (any ToolApprovalHandler)?
         ) async throws -> ToolPlan.Run {
             let navigator = ToolPlan.Navigator(
@@ -264,7 +264,7 @@ public extension ToolPlan {
                 plan: run.plan,
                 attemptNumber: attemptNumber,
                 workspace: workspace,
-                guidelineRelations: guidelineRelations,
+                references: references,
                 approvalHandler: approvalHandler
             )
             let attempt = ToolPlan.Run.Attempt(
@@ -442,7 +442,7 @@ private extension ToolPlan.RunExecutor {
         plan: ToolPlan,
         attemptNumber: Int,
         workspace: WorkspaceContext?,
-        guidelineRelations: [AgentGuidelineRelation],
+        references: [Reference],
         approvalHandler: (any ToolApprovalHandler)?
     ) async throws -> ToolPlan.Result {
         let navigator = ToolPlan.Navigator(
@@ -457,12 +457,12 @@ private extension ToolPlan.RunExecutor {
             let continuationPlan = try ToolPlan(
                 id: "\(plan.id).resume.\(attemptNumber).\(index + 1)",
                 root: step.node,
-                guidelines: plan.guidelines
+                references: plan.references
             )
             let rawResult = try await planExecutor.execute(
                 continuationPlan,
                 workspace: workspace,
-                guidelineRelations: guidelineRelations,
+                references: references,
                 approvalHandler: approvalHandler
             )
             let result = navigator.remap(

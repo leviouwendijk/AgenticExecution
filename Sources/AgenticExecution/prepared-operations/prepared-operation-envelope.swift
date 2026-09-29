@@ -1,6 +1,9 @@
+import Macros
 import Primitives
+import Schema
 
 public extension PreparedOperation {
+    @JSONSchema
     struct Envelope:
         Sendable,
         Codable,
