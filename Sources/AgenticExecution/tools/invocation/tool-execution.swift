@@ -20,6 +20,18 @@ internal struct ToolExecution: Sendable {
         _ call: ToolCall,
         preflight: ToolPreflight
     ) async throws -> ToolExecutionResult {
+        let (value, observations) = try await ToolExecutionObservations.capture {
+            try await executeObserved(call, preflight: preflight)
+        }
+        var result = value
+        result.observations = observations
+        return result
+    }
+
+    private func executeObserved(
+        _ call: ToolCall,
+        preflight: ToolPreflight
+    ) async throws -> ToolExecutionResult {
         do {
             return try await registry.execute(
                 call,

@@ -13,6 +13,9 @@ enum AgenticExecutionFlowSuite: TestFlowRegistry {
     static let title = "AgenticExecution flow tests"
 
     static let flows: [TestFlow] = [
+        TestFlow("tool-execution-observations", tags: ["execution", "observations"]) {
+            try await AgenticExecutionFlowTesting.runExecutionObservations()
+        },
         TestFlow(
             "prepared-intent-operation-authority",
             tags: [

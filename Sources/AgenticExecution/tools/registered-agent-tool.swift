@@ -345,6 +345,18 @@ public struct RegisteredAgentTool: Sendable {
         _ call: ToolCall,
         workspace: WorkspaceContext? = nil
     ) async throws -> ToolExecutionResult {
+        let (value, observations) = try await ToolExecutionObservations.capture(callID: call.id) {
+            try await executeObserved(call, workspace: workspace)
+        }
+        var result = value
+        result.observations = observations
+        return result
+    }
+
+    private func executeObserved(
+        _ call: ToolCall,
+        workspace: WorkspaceContext?
+    ) async throws -> ToolExecutionResult {
         let execution = try await callHandler(
             call,
             workspace
@@ -365,6 +377,24 @@ public struct RegisteredAgentTool: Sendable {
         _ call: ToolCall,
         failure: ToolCall.Failure,
         workspace: WorkspaceContext? = nil
+    ) async throws -> Reconciliation? {
+        let (value, observations) = try await ToolExecutionObservations.capture(
+            callID: call.id,
+            kind: .reconcile
+        ) {
+            try await reconcileObserved(call, failure: failure, workspace: workspace)
+        }
+        if case .some(.applied(var result)) = value {
+            result.observations = observations
+            return .applied(result)
+        }
+        return value
+    }
+
+    private func reconcileObserved(
+        _ call: ToolCall,
+        failure: ToolCall.Failure,
+        workspace: WorkspaceContext?
     ) async throws -> Reconciliation? {
         guard
             failure.tool == capability.definition.identifier,

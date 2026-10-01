@@ -32,6 +32,9 @@ extension AgenticExecutionFlowTesting {
             "safe observe recovery records retry_same_operation"
         )
 
+        try Expect.equal(execution.observations.map(\.content), ["call 1", "call 2"], "retry retains failed and successful attempt observations")
+        try Expect.equal(execution.observations.compactMap { $0.origin?.ordinal }, [1, 2], "retry evidence has distinct operation ordinals")
+
         let output = try JSONToolBridge.decode(
             MechanicalRecoveryOutput.self,
             from: execution.result.output
@@ -74,6 +77,9 @@ extension AgenticExecutionFlowTesting {
             .applied,
             "applied reconciliation records applied effect"
         )
+
+        try Expect.equal(applied.observations.map(\.content), ["call 1", "reconcile"], "reconciliation retains original failure output")
+        try Expect.equal(applied.observations.last?.origin?.operation, .reconcile, "reconciliation evidence is distinguished from execution")
 
         let appliedWithoutOutput = try await mechanicalRecoveryExecution(
             scenario: .mutation_applied_without_output
@@ -564,6 +570,7 @@ private struct MechanicalRecoveryTool: Tool {
             for: input.scenario
         )
 
+        await ToolExecutionObservations.emit(.init(kind: .log, content: "call \(call)"))
         switch scenario {
         case .observe_retry:
             guard call > 1 else {
@@ -657,6 +664,7 @@ private struct MechanicalRecoveryTool: Tool {
         workspace _: WorkspaceContext?
     ) async throws -> ToolCall.Reconciliation<Output>? {
         _ = failure
+        await ToolExecutionObservations.emit(.init(kind: .detail, content: "reconcile"))
 
         switch try scenario(
             from: input
